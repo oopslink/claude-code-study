@@ -1,3 +1,5 @@
+---
+---
 # 模式卡片 #5：Coordinator-Worker 模式
 
 **来源子系统**：多智能体架构（Multi-Agent）

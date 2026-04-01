@@ -1,0 +1,12 @@
+title: Claude Code 源码学习笔记
+description: Claude Code 开源版本源码深度学习记录，覆盖 Agent 循环、工具系统、多智能体、安全沙箱、插件系统、内存管理等核心子系统。
+theme: minima
+lang: zh-CN
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+exclude:
+  - superpowers/

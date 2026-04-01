@@ -1,3 +1,5 @@
+---
+---
 # Task 05：工具系统精读
 
 > 精读范围：`Tool.ts`、`tools.ts`、`FileReadTool/`、`AgentTool/AgentTool.tsx`、`AgentTool/forkSubagent.ts`、`hooks/useCanUseTool.tsx`、`tools/shared/`

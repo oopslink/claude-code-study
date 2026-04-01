@@ -1,3 +1,5 @@
+---
+---
 # Task 06：多智能体架构精读
 
 > 源码路径：`src/Task.ts`、`src/tasks/`、`src/utils/swarm/inProcessRunner.ts`、`src/coordinator/coordinatorMode.ts`
