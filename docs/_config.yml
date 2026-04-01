@@ -1,12 +1,31 @@
 title: Claude Code 源码学习笔记
 description: Claude Code 开源版本源码深度学习记录，覆盖 Agent 循环、工具系统、多智能体、安全沙箱、插件系统、内存管理等核心子系统。
-theme: minima
-lang: zh-CN
+remote_theme: just-the-docs/just-the-docs
 
-markdown: kramdown
+url: https://oopslink.github.io
+baseurl: /claude-code-study
+
+color_scheme: light
+
+# 顶部导航
+aux_links:
+  GitHub:
+    - https://github.com/oopslink/claude-code-study
+
+aux_links_new_tab: true
+
+# 搜索
+search_enabled: true
+search_tokenizer_separator: /[\s\-\u3000-\u303F\u4E00-\u9FFF]+/
+
+# 页脚
+footer_content: "Claude Code 源码学习笔记"
+
+# 代码高亮
 kramdown:
   input: GFM
   hard_wrap: false
+  syntax_highlighter: rouge
 
 exclude:
   - superpowers/
