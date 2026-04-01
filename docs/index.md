@@ -55,6 +55,13 @@ title: Claude Code 源码学习笔记索引
 
 ---
 
+## 苏格拉底专题（对话式深潜）
+
+- [专题 01：安全体系与 Agent 循环](study-notes/superpowers/socratic-01-security-and-agent-loop.md)
+  — 五层防御模型、Bash AST fail-closed、flag 级只读白名单、git hooks 攻击、Agent 状态机、工具并发控制
+
+---
+
 ## 设计模式卡片
 
 - [10 个可复用模式卡片索引](study-notes/patterns/README.md)
