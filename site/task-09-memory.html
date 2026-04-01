@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 9 · 内存管理 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-b$ <span style="color:var(--green)">cat task-09-memory.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 09：上下文与内存管理精读</h1>
+<blockquote>
+<p>研究日期：2026-03-31
+覆盖文件：memdir/memdir.ts, memdir/memoryTypes.ts, memdir/paths.ts,
+services/compact/autoCompact.ts, services/compact/compact.ts (前 400+ 行),
+services/compact/prompt.ts, services/extractMemories/extractMemories.ts,
+services/extractMemories/prompts.ts, utils/sessionStorage.ts (前 320 行)</p>
+</blockquote>
+<hr>
+<h2>三层内存架构全景</h2>
+<div class="code-block"><pre>┌──────────────────────────────────────────────────────────────────────┐
+│ 长期内存（memory files / memdir）                                      │
+│                                                                      │
+│ 路径：&lt;memoryBase&gt;/projects/&lt;sanitized-git-root&gt;/memory/             │
+│       其中 memoryBase 默认 ~/.claude，CCR 时由                        │
+│       CLAUDE_CODE_REMOTE_MEMORY_DIR 覆盖                             │
+│                                                                      │
+│ 加载：每次对话启动时通过 loadMemoryPrompt() 注入 system prompt         │
+│       • MEMORY.md（索引，最多 200 行 / 25KB）直接嵌入提示文字           │
+│       • 完整 topic 文件由 LLM 按需 Read                               │
+│                                                                      │
+│ 写入：两条路径                                                         │
+│   A. 主 agent 在对话中显式 Write/Edit（用户说"记住…"）                 │
+│   B. 后台 extractMemories 子代理（每轮对话结束时异步触发）              │
+└──────────────────────────────────────────────────────────────────────┘
+                    ↑ 提取自对话历史
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 中期内存（compact 摘要）                                               │
+│                                                                      │
+│ 存储：随会话历史一起持久化到 JSONL，作为 compact boundary 后的         │
+│       user message 重新加载到下次 API 请求                             │
+│                                                                      │
+│ 触发：token 使用量超过自动压缩阈值                                      │
+│   threshold = effectiveContextWindow - 13,000（AUTOCOMPACT_BUFFER） │
+│   effectiveContextWindow = modelContextWindow - min(maxOutput, 20K)  │
+│                                                                      │
+│ 生成：LLM 对话摘要（forked agent 共享 prompt cache）                   │
+└──────────────────────────────────────────────────────────────────────┘
+                    ↑ 压缩自
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 短期内存（session messages / sessionStorage）                         │
+│                                                                      │
+│ 路径：&lt;projectsDir&gt;/&lt;sanitized-cwd&gt;/&lt;sessionId&gt;.jsonl                │
+│       projectsDir = ~/.claude/projects/                              │
+│                                                                      │
+│ 格式：JSONL（每行一个 JSON 对象）                                       │
+│ 链接：parentUuid 字段形成链式结构（类 git commit chain）               │
+│ 生命周期：会话内持久 → 可通过 --resume 恢复                            │
+└──────────────────────────────────────────────────────────────────────┘</pre></div><hr>
+<h2>一、长期内存（memdir / memory files）</h2>
+<h3>1. 存储路径</h3>
+<p><strong>关键函数</strong>：<code>getAutoMemPath()</code> in <code>memdir/paths.ts</code></p>
+<p>路径解析优先级（第一个命中的获胜）：</p>
+<ol>
+<li><code>CLAUDE_COWORK_MEMORY_PATH_OVERRIDE</code> 环境变量（Cowork 专用，完整路径覆盖）</li>
+<li>settings.json 中的 <code>autoMemoryDirectory</code> 字段（支持 <code>~/</code> 展开；仅信任 policy/local/user 源，projectSettings 被排除以防恶意仓库劫持写路径）</li>
+<li>默认计算路径：</li>
+</ol>
+<div class="code-block"><pre>&lt;memoryBaseDir&gt;/projects/&lt;sanitized(canonicalGitRoot)&gt;/memory/</pre></div><p>其中：</p>
+<ul>
+<li><code>memoryBaseDir</code>：默认 <code>~/.claude</code>，CCR 时为 <code>CLAUDE_CODE_REMOTE_MEMORY_DIR</code></li>
+<li><code>canonicalGitRoot</code>：<code>findCanonicalGitRoot(projectRoot)</code>，git worktree 场景下所有 worktree 共享同一 memory 目录</li>
+<li><code>sanitizePath()</code>：将项目路径转成安全的目录名（处理特殊字符）</li>
+</ul>
+<p><strong>结果示例</strong>：</p>
+<div class="code-block"><pre>~/.claude/projects/Users-alice-works-myproject/memory/</pre></div><hr>
+<h3>2. <code>loadMemoryPrompt()</code> 的逻辑</h3>
+<p><strong>文件</strong>：<code>memdir/memdir.ts</code> line 419</p>
+<div class="code-block"><pre>loadMemoryPrompt()
+  │
+  ├─ feature('KAIROS') &amp;&amp; getKairosActive()
+  │    └─→ buildAssistantDailyLogPrompt()（助手模式：按日志追加，不维护 MEMORY.md）
+  │
+  ├─ feature('TEAMMEM') &amp;&amp; isTeamMemoryEnabled()
+  │    └─→ buildCombinedMemoryPrompt()（auto + team 两个目录）
+  │
+  ├─ isAutoMemoryEnabled()
+  │    └─→ buildMemoryLines()（单 auto 目录，返回指令文本但不含 MEMORY.md 内容）
+  │         注意：这里只返回"如何使用内存"的指令，MEMORY.md 内容通过 claudemd.ts
+  │         的 getMemoryFiles() 路径注入（并非 buildMemoryPrompt）
+  │
+  └─ disabled → 返回 null（记录 telemetry）</pre></div><p><strong>注入位置</strong>：<code>loadMemoryPrompt()</code> 的结果作为 <code>systemPromptSection(&#39;memory&#39;, ...)</code> 的一部分，最终拼接在 system prompt 中。MEMORY.md 的实际内容通过 <code>claudemd.ts</code> 在 user context 部分注入（区分 agent mode 和普通 mode）。</p>
+<p><strong>MEMORY.md 截断保护</strong>：</p>
+<ul>
+<li>超过 200 行：只保留前 200 行</li>
+<li>超过 25,000 字节：在最后一个换行处截断</li>
+<li>触发任一上限时，在末尾追加警告注释</li>
+</ul>
+<hr>
+<h3>3. MemoryType 四类型分类</h3>
+<p><strong>文件</strong>：<code>memdir/memoryTypes.ts</code></p>
+<div class="code-block"><pre>export const MEMORY_TYPES = ['user', 'feedback', 'project', 'reference'] as const</pre></div><div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>明确不存储的内容</strong>（代码可推导的内容）：</p>
+<ul>
+<li>代码模式、架构、文件路径、项目结构</li>
+<li>Git 历史（<code>git log/blame</code> 是权威来源）</li>
+<li>调试方案/修复食谱（fix 在代码里，commit message 有上下文）</li>
+<li>CLAUDE.md 中已记录的内容</li>
+<li>短暂任务细节（当前进行中的工作、临时状态）</li>
+</ul>
+<p><strong>内存文件格式</strong>（YAML frontmatter + Markdown body）：</p>
+<div class="code-block"><pre>---
+name: {{memory name}}
+description: {{one-line description}}
+type: {{user, feedback, project, reference}}
+---
+
+{{memory content — feedback/project 类型结构：规则/事实 + Why: + How to apply:}}</pre></div><hr>
+<h2>二、中期内存（compact / 上下文压缩）</h2>
+<h3>4. 自动压缩触发条件</h3>
+<p><strong>文件</strong>：<code>services/compact/autoCompact.ts</code></p>
+<p><strong>阈值计算链</strong>：</p>
+<div class="code-block"><pre>effectiveContextWindow = modelContextWindow(model) - min(maxOutput, 20_000)
+                         ↑ 20K 是 p99.99 的摘要输出 token 数（17,387）的安全边界
+
+autoCompactThreshold = effectiveContextWindow - 13_000（AUTOCOMPACT_BUFFER_TOKENS）
+
+CLAUDE_AUTOCOMPACT_PCT_OVERRIDE → 可按百分比覆盖（测试用）
+CLAUDE_CODE_AUTO_COMPACT_WINDOW → 可覆盖 contextWindow 上限</pre></div><p><strong>触发逻辑</strong>（<code>shouldAutoCompact()</code>）：</p>
+<ol>
+<li>排除 querySource 为 <code>session_memory</code> 或 <code>compact</code> 的递归调用（避免死锁）</li>
+<li>排除 <code>isAutoCompactEnabled() === false</code>（可通过 <code>DISABLE_AUTO_COMPACT</code> 或 settings 关闭）</li>
+<li>排除 context collapse 模式已开启（两个系统会竞争同一问题）</li>
+<li>计算 <code>tokenCountWithEstimation(messages) - snipTokensFreed</code></li>
+<li>若 token 数 &gt;= autoCompactThreshold → 返回 true</li>
+</ol>
+<p><strong>熔断器（circuit breaker）</strong>：3 次连续失败后停止尝试（避免卡死的会话无限耗费 API 调用）。</p>
+<hr>
+<h3>5. 哪些消息被压缩，哪些被保留</h3>
+<p><strong>默认行为（全量 compact）</strong>：</p>
+<ul>
+<li>所有消息都传给 LLM 生成摘要</li>
+<li>压缩后消息历史清空，替换为：<code>[boundaryMarker, summaryMessage, ...attachments, ...hookResults]</code></li>
+<li>图片块在送往压缩 API 前被剔除（<code>stripImagesFromMessages()</code>），替换为 <code>[image]</code> 文字标记</li>
+</ul>
+<p><strong>session memory compact（实验性，先于标准 compact 尝试）</strong>：</p>
+<ul>
+<li><code>trySessionMemoryCompaction()</code> 可保留一部分最近消息（suffix-preserving）</li>
+<li>保留段信息写入 <code>compact boundary.compactMetadata.preservedSegment</code></li>
+</ul>
+<p><strong>post-compact 重注入</strong>：</p>
+<ul>
+<li>读过的文件（最多 5 个，每个最多 5000 token）</li>
+<li>已调用的技能内容（最多 25K token）</li>
+<li>Plan 文件</li>
+<li>Deferred tools delta、agent listing delta、MCP instructions delta</li>
+</ul>
+<hr>
+<h3>6. 压缩摘要 prompt</h3>
+<p><strong>文件</strong>：<code>services/compact/prompt.ts</code></p>
+<p><strong>基础结构</strong>（<code>BASE_COMPACT_PROMPT</code>）：</p>
+<div class="code-block"><pre>CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
+[NO_TOOLS_PREAMBLE — 防止模型在唯一 turn 里浪费一次工具调用]
+
+Your task is to create a detailed summary of the conversation so far...
+
+Before providing your final summary, wrap your analysis in &lt;analysis&gt; tags...
+[DETAILED_ANALYSIS_INSTRUCTION — 让模型先做草稿，提升摘要质量]
+
+Your summary should include the following sections:
+1. Primary Request and Intent       ← 用户诉求（完整保留）
+2. Key Technical Concepts           ← 技术术语/框架
+3. Files and Code Sections          ← 文件路径 + 完整代码片段
+4. Errors and fixes                 ← 错误 + 修复方法 + 用户反馈
+5. Problem Solving                  ← 已解决问题 / 进行中的排查
+6. All user messages                ← 全部用户消息（非工具结果）
+7. Pending Tasks                    ← 待办任务
+8. Current Work                     ← 最近在做什么（含文件名+代码）
+9. Optional Next Step               ← 下一步（必须与最近用户请求一致）</pre></div><p><strong>三种 prompt 变体</strong>：</p>
+<ul>
+<li><code>getCompactPrompt()</code>：全量压缩（BASE_COMPACT_PROMPT）</li>
+<li><code>getPartialCompactPrompt(direction=&#39;from&#39;)</code>：部分压缩，从某消息往后（PARTIAL_COMPACT_PROMPT）</li>
+<li><code>getPartialCompactPrompt(direction=&#39;up_to&#39;)</code>：部分压缩，到某消息为止（PARTIAL_COMPACT_UP_TO_PROMPT）</li>
+</ul>
+<p><strong>后处理</strong>（<code>formatCompactSummary()</code>）：</p>
+<ul>
+<li>剥离 <code>&lt;analysis&gt;...&lt;/analysis&gt;</code> 草稿块（纯质量辅助，不进入上下文）</li>
+<li>提取 <code>&lt;summary&gt;...&lt;/summary&gt;</code> 内容，加上 <code>Summary:</code> 标头</li>
+</ul>
+<hr>
+<h3>7. 压缩后消息历史结构变化</h3>
+<p><strong>压缩前</strong>：</p>
+<div class="code-block"><pre>[user_0, assistant_0, user_1, assistant_1, ..., user_N, assistant_N]
+                       ↑ 完整对话历史，O(N) 条消息</pre></div><p><strong><code>compactConversation()</code> 执行流程</strong>：</p>
+<div class="code-block"><pre>1. 调用 forked agent（streamCompactSummary），传入全部消息
+2. 获得摘要文本 summary（已通过 formatCompactSummary 清洗）
+3. 创建 boundaryMarker（SystemCompactBoundaryMessage）
+4. 创建 summaryMessages（UserMessage，isCompactSummary=true）
+5. 收集 postCompactFileAttachments（文件、技能、plan、deferred tools 等）
+6. 返回 CompactionResult</pre></div><p><strong>压缩后消息数组（buildPostCompactMessages 结果）</strong>：</p>
+<div class="code-block"><pre>[
+  boundaryMarker,          // SystemCompactBoundaryMessage (subtype='compact_boundary')
+  ...summaryMessages,      // UserMessage（摘要内容）
+  ...messagesToKeep,       // 可选：保留的近期消息（partial/session-memory compact）
+  ...attachments,          // AttachmentMessage（文件快照、技能等）
+  ...hookResults,          // HookResultMessage（SessionStart hook 输出）
+]</pre></div><p><strong>REPL 侧消息切片</strong>：</p>
+<ul>
+<li><code>getMessagesAfterCompactBoundary()</code> 扫描到最后一个 compact boundary，只取 boundary 之后的消息送 API</li>
+<li>boundary 本身是 system message，<code>normalizeMessagesForAPI()</code> 会过滤掉它</li>
+</ul>
+<hr>
+<h3>8. SDKCompactBoundaryMessage / SystemCompactBoundaryMessage</h3>
+<p><strong>文件</strong>：<code>utils/messages.ts</code>（<code>createCompactBoundaryMessage()</code>）</p>
+<div class="code-block"><pre>{
+  type: 'system',
+  subtype: 'compact_boundary',
+  content: 'Conversation compacted',
+  isMeta: false,
+  timestamp: string,
+  uuid: UUID,
+  level: 'info',
+  compactMetadata: {
+    trigger: 'manual' | 'auto',
+    preTokens: number,               // 压缩前 token 数
+    lastPreCompactMessageUuid: UUID, // 最后一条被压缩的消息 UUID
+    userContext?: string,            // 用户自定义压缩指令
+    messagesSummarized?: number,
+    preCompactDiscoveredTools?: string[], // 压缩前已加载的 deferred tools
+    preservedSegment?: {             // session-memory compact 时保留段的指针
+      headUuid: UUID,
+      anchorUuid: UUID,
+      tailUuid: UUID,
+    },
+  }
+}</pre></div><p><strong>作用</strong>：</p>
+<ol>
+<li><strong>消息历史切片标记</strong>：<code>getMessagesAfterCompactBoundary()</code> 用它找到&quot;从哪里开始&quot;，只把 boundary 之后的消息发给 API</li>
+<li><strong>JSONL 恢复优化</strong>：<code>loadTranscriptFile()</code> 加载大文件时跳过 boundary 之前的所有内容，只解析后半段（<code>readTranscriptForLoad()</code>），显著降低 OOM 风险（151MB 文件从 ~316MB RSS 降至 ~155MB）</li>
+<li><strong>元数据锚点</strong>：<code>preservedSegment</code> 用于 session-memory compact 场景的消息重链接</li>
+</ol>
+<hr>
+<h2>三、短期内存（session messages / sessionStorage）</h2>
+<h3>9. 存储路径与格式</h3>
+<p><strong>路径计算</strong>（<code>getTranscriptPath()</code>，<code>utils/sessionStorage.ts</code>）：</p>
+<div class="code-block"><pre>&lt;projectsDir&gt;/&lt;sanitized(originalCwd)&gt;/&lt;sessionId&gt;.jsonl</pre></div><p>其中：</p>
+<ul>
+<li><code>projectsDir = ~/.claude/projects/</code></li>
+<li><code>sanitized(cwd)</code>：原始工作目录经 sanitizePath 处理后的字符串</li>
+<li><code>sessionId</code>：UUID，每次启动新会话生成</li>
+</ul>
+<p><strong>子代理 transcript</strong>（<code>getAgentTranscriptPath()</code>）：</p>
+<div class="code-block"><pre>&lt;projectDir&gt;/&lt;sessionId&gt;/subagents/[&lt;subdir&gt;/]agent-&lt;agentId&gt;.jsonl</pre></div><p><strong>格式</strong>：JSONL（每行一个完整 JSON 对象，换行分隔）</p>
+<p><strong>链式结构</strong>：每条消息有 <code>uuid</code> 和 <code>parentUuid</code> 字段，形成有向无环图（DAG）；分叉操作会产生多个叶节点，<code>buildConversationChain()</code> 通过 <code>leafUuids</code> 和逆向 parentUuid 遍历重建主链。</p>
+<p><strong>写入方式</strong>：实时 append-only；每条新消息通过 <code>fsAppendFile</code> 追加到文件末尾，不重写整个文件。</p>
+<p><strong>消息类型分类</strong>：</p>
+<ul>
+<li><strong>TranscriptMessage</strong>（持久化）：<code>user | assistant | attachment | system</code></li>
+<li><strong>Progress message</strong>（不持久化）：UI 只读的进度推送，不写 JSONL</li>
+</ul>
+<hr>
+<h3>10. 会话恢复（<code>loadTranscriptFile()</code>）</h3>
+<p><strong>文件</strong>：<code>utils/sessionStorage.ts</code> line 3472</p>
+<p><strong>恢复流程</strong>：</p>
+<div class="code-block"><pre>loadTranscriptFile(filePath)
+  │
+  ├─ [大文件优化] size &gt; SKIP_PRECOMPACT_THRESHOLD:
+  │    ├─ readTranscriptForLoad()：字节级扫描，找最后一个 compact boundary
+  │    │   → 只读取 boundary 之后的字节（buf = postBoundaryBuf）
+  │    │   → 如果有截断，通过 scanPreBoundaryMetadata() 回捞 session 级元数据
+  │    │      （custom title、tag、mode、pr-link 等）
+  │    └─ hasPreservedSegment：标记是否有保留段（需要特殊重链接）
+  │
+  ├─ [小文件] 直接 parseJSONL 完整内容
+  │
+  ├─ 逐行解析 Entry：
+  │    ├─ isTranscriptMessage → 放入 messages Map（uuid → TranscriptMessage）
+  │    ├─ isLegacyProgressEntry → 跳过（老版本历史兼容）
+  │    ├─ 'summary' → summaries Map
+  │    ├─ 'custom-title' → customTitles Map
+  │    └─ 其他元数据 entry → 对应 Map
+  │
+  └─ 返回：{ messages, summaries, ..., leafUuids }</pre></div><p><strong>使用侧</strong>（<code>loadMessages()</code>，line 2289 附近）：</p>
+<ol>
+<li>调用 <code>loadTranscriptFile()</code> 得到 messages Map</li>
+<li>调用 <code>buildConversationChain()</code> 从叶节点逆向 parentUuid 重建有序消息链</li>
+<li>将链式消息恢复为 <code>Message[]</code>，交给 REPL/App state</li>
+</ol>
+<hr>
+<h2>四、自动记忆提取（extractMemories）</h2>
+<h3>11. 触发时机</h3>
+<p><strong>文件</strong>：<code>services/extractMemories/extractMemories.ts</code></p>
+<p><strong>触发路径</strong>：</p>
+<div class="code-block"><pre>对话结束 → handleStopHooks() → executeExtractMemories()（fire-and-forget）</pre></div><p>具体是：<strong>每次主 agent 产生最终响应（无工具调用）时</strong>（即一个 query loop 完成时），通过 <code>handleStopHooks</code> in <code>stopHooks.ts</code> 触发。</p>
+<p><strong>执行条件（所有都要满足）</strong>：</p>
+<ul>
+<li>feature gate <code>tengu_passport_quail</code> 开启（GrowthBook 控制）</li>
+<li><code>isAutoMemoryEnabled() === true</code></li>
+<li>非 remote mode</li>
+<li>非子代理调用（<code>context.toolUseContext.agentId === undefined</code>）</li>
+</ul>
+<p><strong>互斥逻辑</strong>：</p>
+<ul>
+<li>若主 agent 本轮已向 memory 路径写过文件（<code>hasMemoryWritesSince()</code>），跳过提取，只推进游标</li>
+<li>若上一次提取仍在进行中，新请求被&quot;stash&quot;（存储为 <code>pendingContext</code>），当前轮结束后执行 trailing run</li>
+<li>节流控制（实验性，<code>tengu_bramble_lintel</code>）：可配置每 N 轮只触发一次</li>
+</ul>
+<p><strong>游标机制</strong>：<code>lastMemoryMessageUuid</code> 记录上次处理到的消息 UUID。每次提取只处理 cursor 之后的新消息（<code>countModelVisibleMessagesSince()</code>），成功后推进游标。</p>
+<p><strong>关闭顺序</strong>：<code>drainPendingExtraction()</code> 在 <code>print.ts</code> 输出响应后、进程 shutdown 前调用，确保正在进行的提取能完成（超时 60s）。</p>
+<hr>
+<h3>12. 提取算法与 prompt</h3>
+<p><strong>文件</strong>：<code>services/extractMemories/prompts.ts</code></p>
+<p><strong>Prompt 结构</strong>（<code>buildExtractAutoOnlyPrompt()</code>）：</p>
+<div class="code-block"><pre>opener:
+  "You are now acting as the memory extraction subagent. Analyze the most
+   recent ~{newMessageCount} messages above..."
+
+Available tools: Read, Grep, Glob, read-only Bash, Edit/Write（仅限 memory 目录）
+
+Turn budget hint:
+  "Turn 1 — 并行发出所有需要更新的文件的 Read 调用
+   Turn 2 — 并行发出所有 Write/Edit 调用
+   不要跨轮交叉读写"
+
+约束：
+  "MUST only use content from the last ~N messages.
+   Do not verify by grepping source files."
+
+已有记忆清单（existingMemories manifest）：
+  防止重复写入，先对比再决定新建还是更新
+
+Types of memory: [TYPES_SECTION_INDIVIDUAL]
+
+What NOT to save: [WHAT_NOT_TO_SAVE_SECTION]
+
+How to save memories:
+  Step 1: 写 topic 文件（带 frontmatter）
+  Step 2: 在 MEMORY.md 中添加一行索引指针</pre></div><p><strong>Fork 模式</strong>：<code>runForkedAgent()</code>，共享父对话的 prompt cache（<code>cacheSafeParams</code>），最多 5 轮对话，<code>querySource=&#39;extract_memories&#39;</code>，<code>skipTranscript=true</code>（不记录到 transcript 避免竞争）。</p>
+<p><strong>写入路径</strong>：提取 agent 通过 Write/Edit 工具将 topic 文件写到 <code>getAutoMemPath()</code> 目录。完成后通过 <code>appendSystemMessage?.()</code> 向用户展示&quot;已保存 X 条记忆&quot;的 system message。</p>
+<p><strong>权限沙箱</strong>（<code>createAutoMemCanUseTool()</code>）：</p>
+<ul>
+<li>Read/Grep/Glob：无限制</li>
+<li>Bash：只允许只读命令（<code>ls/find/cat/stat</code> 等）</li>
+<li>Edit/Write：只允许写入 memory 目录内路径</li>
+<li>其他一切（MCP、Agent、写权限 Bash）：拒绝</li>
+</ul>
+<hr>
+<h2>必答问题总结</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>模式卡片 #9：分层内存架构</h2>
+<p><strong>问题</strong>：Agent 如何在对话轮次间、会话间保持连贯的「记忆」，同时不让所有信息都堆进 context window？</p>
+<p><strong>方案（三层分离实现）</strong>：</p>
+<ol>
+<li><p><strong>短期（session messages）</strong></p>
+<ul>
+<li>存储：<code>~/.claude/projects/&lt;sanitized-cwd&gt;/&lt;sessionId&gt;.jsonl</code>（append-only JSONL）</li>
+<li>持久化：每条消息实时 append，parentUuid 形成 DAG 链，支持分叉和多叶节点</li>
+<li>恢复：<code>loadTranscriptFile()</code> → <code>buildConversationChain()</code> → 重建有序列表</li>
+<li>生命周期：单次会话范围内，可通过 <code>--resume</code> 跨进程恢复</li>
+</ul>
+</li>
+<li><p><strong>中期（compact 摘要）</strong></p>
+<ul>
+<li>触发：token 使用量超过阈值（模型 context window - 20K 输出预留 - 13K 缓冲）</li>
+<li>生成：forked agent 共享 prompt cache，调用 LLM 生成 9 章节结构化摘要</li>
+<li>存储：压缩后的摘要作为 UserMessage 写回 JSONL，<code>SystemCompactBoundaryMessage</code> 作为切片标记</li>
+<li>恢复：加载时只读取 boundary 后的内容，大幅降低内存占用</li>
+</ul>
+</li>
+<li><p><strong>长期（memory files）</strong></p>
+<ul>
+<li>存储：<code>~/.claude/projects/&lt;sanitized-git-root&gt;/memory/*.md</code>（每条记忆一个文件 + MEMORY.md 索引）</li>
+<li>写入：主 agent 显式写 OR 每轮结束后 extractMemories 后台子代理自动提取</li>
+<li>加载：<code>loadMemoryPrompt()</code> 在 system prompt 中注入操作指令；MEMORY.md 索引注入 user context；topic 文件按需 Read</li>
+</ul>
+</li>
+</ol>
+<p><strong>关键洞察</strong>：</p>
+<ul>
+<li>不同时间尺度需要不同策略：秒级内的工具调用用 in-memory state，分钟级的对话流用 JSONL 持久化，小时/天级的跨会话知识用结构化记忆文件</li>
+<li>Compact 摘要并不是&quot;内存&quot;——它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识</li>
+<li>Git root 而非 CWD 作为记忆目录键，使 worktree 切换场景下记忆不会孤立</li>
+</ul>
+<p><strong>权衡</strong>：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>模式卡片 #10：上下文压缩触发与摘要注入</h2>
+<p><strong>问题</strong>：Context window 有限（200K token），如何在长对话中不丢失重要信息？</p>
+<p><strong>方案（基于 autoCompact.ts + compact.ts）</strong>：</p>
+<p><strong>阈值触发</strong>：</p>
+<div class="code-block"><pre>每次 query loop 结束后检查：tokenCountWithEstimation(messages) &gt;= threshold
+threshold = contextWindow - reserved_for_output(20K) - buffer(13K)</pre></div><p><strong>执行流程</strong>：</p>
+<div class="code-block"><pre>shouldAutoCompact() → true
+  ↓
+trySessionMemoryCompaction()（实验性，尝试保留最近消息）
+  ↓（若不适用）
+compactConversation()
+  1. executePreCompactHooks()（外部系统可注入自定义指令）
+  2. forked agent with NO_TOOLS_PREAMBLE + getCompactPrompt() → 生成摘要
+     （prompt-too-long 时循环截头重试，最多 3 次）
+  3. stripImagesFromMessages()（压缩前去除图片）
+  4. 生成 CompactionResult:
+     { boundaryMarker, summaryMessages, attachments, hookResults }
+  5. REPL 将旧消息替换为 CompactionResult 的内容
+  6. 写 boundary marker 到 JSONL（持久化）
+  7. executePostCompactHooks() / processSessionStartHooks()</pre></div><p><strong>关键设计决策：为什么用 LLM 生成摘要而不是硬截断？</strong></p>
+<p>硬截断有两个致命问题：</p>
+<ol>
+<li><strong>信息丢失不可控</strong>：截断最老的消息可能丢掉关键的用户原始意图（&quot;我想要 X&quot;）或已确认的设计决策</li>
+<li><strong>任务状态断裂</strong>：当前工作&quot;Current Work&quot;可能依赖几轮前建立的上下文</li>
+</ol>
+<p>LLM 摘要可以：</p>
+<ul>
+<li>跨时间段提炼关键信息（Primary Request + Pending Tasks + Current Work）</li>
+<li>将全部用户消息明确列出（保持意图追踪）</li>
+<li>在 9 章节结构中保留代码片段和错误修复路径</li>
+</ul>
+<p>代价：摘要本身需要一次完整 API 调用（tokens ≈ 原来的 context 大小），但通过 prompt cache 共享将实际增量 API 成本降到很低（实验数据：forked path 节省 ~99%+ cache miss）。</p>
+<p><strong>权衡</strong>：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>关键文件索引</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

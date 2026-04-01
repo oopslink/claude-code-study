@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 5 · 工具系统 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-b$ <span style="color:var(--green)">cat task-05-tool-system.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 05：工具系统精读</h1>
+<blockquote>
+<p>精读范围：<code>Tool.ts</code>、<code>tools.ts</code>、<code>FileReadTool/</code>、<code>AgentTool/AgentTool.tsx</code>、<code>AgentTool/forkSubagent.ts</code>、<code>hooks/useCanUseTool.tsx</code>、<code>tools/shared/</code></p>
+</blockquote>
+<hr>
+<h2>一、必答问题</h2>
+<h3>Q1：<code>call()</code> 方法的完整签名</h3>
+<div class="code-block"><pre>call(
+  args: z.infer&lt;Input&gt;,                // Zod schema 推断出的输入类型
+  context: ToolUseContext,             // 工具执行上下文（贯穿整个调用链）
+  canUseTool: CanUseToolFn,            // 权限检查函数（由框架注入）
+  parentMessage: AssistantMessage,     // 触发此工具调用的 assistant 消息
+  onProgress?: ToolCallProgress&lt;P&gt;,   // 可选的进度回调
+): Promise&lt;ToolResult&lt;Output&gt;&gt;</pre></div><p><code>ToolResult&lt;T&gt;</code> 的结构：</p>
+<div class="code-block"><pre>type ToolResult&lt;T&gt; = {
+  data: T                              // 工具执行的实际输出
+  newMessages?: (UserMessage | AssistantMessage | AttachmentMessage | SystemMessage)[]
+  contextModifier?: (context: ToolUseContext) =&gt; ToolUseContext  // 仅非并发安全工具可用
+  mcpMeta?: {
+    _meta?: Record&lt;string, unknown&gt;
+    structuredContent?: Record&lt;string, unknown&gt;
+  }
+}</pre></div><hr>
+<h3>Q2：Tool 接口需要实现的全部方法和属性</h3>
+<p><strong>必须实现（非 Defaultable）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>有默认值的方法（可不实现，<code>buildTool()</code> 填入安全默认值）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>可选扩展方法（按需实现）：</strong></p>
+<ul>
+<li><code>description(input, opts)</code> — 异步描述字符串（用于权限提示文案）</li>
+<li><code>validateInput(input, ctx)</code> — 输入校验，在权限检查前运行</li>
+<li><code>preparePermissionMatcher(input)</code> — 为 hook <code>if</code> 条件准备模式匹配器</li>
+<li><code>isSearchOrReadCommand(input)</code> — 控制 UI 折叠展示</li>
+<li><code>isOpenWorld(input)</code> — 是否开放世界操作</li>
+<li><code>interruptBehavior()</code> — 新消息到来时工具行为：<code>&#39;cancel&#39;</code> | <code>&#39;block&#39;</code></li>
+<li><code>inputsEquivalent(a, b)</code> — 两个输入是否等价（用于去重）</li>
+<li><code>backfillObservableInput(input)</code> — 在钩子/权限系统看到 input 前填充遗留字段</li>
+<li><code>getPath(input)</code> — 提取文件路径（供权限系统使用）</li>
+<li><code>getToolUseSummary(input)</code> — 紧凑视图的摘要文本</li>
+<li><code>getActivityDescription(input)</code> — Spinner 显示的活动描述</li>
+<li><code>extractSearchText(output)</code> — 供 transcript 搜索索引的文本</li>
+<li><code>isResultTruncated(output)</code> — 是否截断（控制点击展开行为）</li>
+<li><code>renderToolResultMessage(...)</code> — 渲染工具结果的 UI</li>
+<li><code>renderToolUseProgressMessage(...)</code> — 渲染进度 UI</li>
+<li><code>renderToolUseRejectedMessage(...)</code> — 渲染拒绝 UI</li>
+<li><code>renderToolUseErrorMessage(...)</code> — 渲染错误 UI</li>
+<li><code>renderGroupedToolUse(...)</code> — 渲染多个并行调用的组 UI</li>
+<li><code>renderToolUseTag(input)</code> — 工具调用旁边的附加标签</li>
+<li><code>renderToolUseQueuedMessage()</code> — 排队等待时的 UI</li>
+</ul>
+<p><strong>特殊标志字段：</strong></p>
+<ul>
+<li><code>aliases?: string[]</code> — 兼容旧工具名</li>
+<li><code>searchHint?: string</code> — ToolSearch 关键词提示（3-10 词）</li>
+<li><code>shouldDefer?: boolean</code> — 是否延迟加载（需 ToolSearch 后才能调用）</li>
+<li><code>alwaysLoad?: boolean</code> — 始终出现在初始 prompt 中（不延迟）</li>
+<li><code>isMcp?: boolean</code> — 是否 MCP 工具</li>
+<li><code>isLsp?: boolean</code> — 是否 LSP 工具</li>
+<li><code>strict?: boolean</code> — 是否启用 API 严格模式</li>
+<li><code>outputSchema?: z.ZodType</code> — 输出 schema（可选）</li>
+</ul>
+<hr>
+<h3>Q3：<code>ToolUseContext</code> 中最常用的 3-5 个字段</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>其中 <code>getAppState()</code> + <code>setAppState()</code> 是最核心的一对，几乎所有有状态操作都经过它们。<code>abortController</code> 是安全取消的统一入口。</p>
+<hr>
+<h3>Q4：<code>getTools()</code> vs <code>getAllBaseTools()</code> 的区别</h3>
+<p><strong><code>getAllBaseTools()</code>（信息来源，<code>tools.ts:193</code>）：</strong></p>
+<ul>
+<li>返回当前环境下<strong>理论上可能存在</strong>的所有工具的完整列表</li>
+<li>包含所有 feature-gated 工具（按 <code>process.env</code>、<code>feature()</code> 标志决定）</li>
+<li>不考虑权限规则，不考虑 <code>isEnabled()</code> 状态</li>
+<li>用于：system prompt 缓存稳定性计算、工具搜索阈值计算、preset 列表</li>
+</ul>
+<p><strong><code>getTools(permissionContext)</code>（会话工具集，<code>tools.ts:271</code>）：</strong></p>
+<ul>
+<li>这是<strong>决定本次会话有哪些工具</strong>的核心函数</li>
+<li>执行流程：<ol>
+<li>若 <code>CLAUDE_CODE_SIMPLE=true</code>，仅返回 <code>[BashTool, FileReadTool, FileEditTool]</code>（或 REPLTool）</li>
+<li>从 <code>getAllBaseTools()</code> 过滤掉特殊工具（MCP 相关等）</li>
+<li>调用 <code>filterToolsByDenyRules()</code> 过滤被 deny 规则整体禁止的工具</li>
+<li>若 REPL 模式启用，过滤掉 <code>REPL_ONLY_TOOLS</code>（基础原语被 REPL 包装）</li>
+<li>调用每个工具的 <code>isEnabled()</code> 过滤掉自报不可用的工具</li>
+</ol>
+</li>
+</ul>
+<p><strong>完整的工具池组装由 <code>assembleToolPool()</code> 完成</strong>，它在 <code>getTools()</code> 基础上合并 MCP 工具，并对两个分区分别排序以保证 prompt cache 稳定性。</p>
+<hr>
+<h3>Q5：条件工具（环境感知启用）的处理方式</h3>
+<p><strong>具体例子：REPLTool（仅 ant 内部员工可用）</strong></p>
+<div class="code-block"><pre>// tools.ts:16-19
+const REPLTool =
+  process.env.USER_TYPE === 'ant'
+    ? require('./tools/REPLTool/REPLTool.js').REPLTool
+    : null</pre></div><p>在 <code>getAllBaseTools()</code> 中：</p>
+<div class="code-block"><pre>...(process.env.USER_TYPE === 'ant' &amp;&amp; REPLTool ? [REPLTool] : []),</pre></div><p><strong>其他条件工具的模式：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>关键设计</strong>：用 <code>require()</code> 而非 <code>import</code> 配合三元运算符，实现 Bun 的 dead code elimination——对于 <code>feature(&#39;X&#39;) ? require(...) : null</code>，Bun 在编译时可以完全剔除未启用的代码路径，缩小最终二进制大小。</p>
+<hr>
+<h3>Q6：FileReadTool 的 <code>call()</code> 核心逻辑和返回格式</h3>
+<p><strong>核心逻辑（<code>FileReadTool.ts:496-651</code>）：</strong></p>
+<ol>
+<li><strong>读取限制配置</strong>：从 <code>context.fileReadingLimits</code> 获取 <code>maxTokens</code>、<code>maxSizeBytes</code>（支持调用方覆盖默认值）</li>
+<li><strong>路径规范化</strong>：<code>expandPath(file_path)</code> 展开 <code>~</code>、清理空白、统一路径分隔符</li>
+<li><strong>去重检查（dedup）</strong>：查询 <code>readFileState</code> 缓存——若文件范围完全匹配且 mtime 未变，直接返回 <code>{type: &#39;file_unchanged&#39;}</code> stub，避免重复发送相同内容给模型（节省 cache_creation tokens）</li>
+<li><strong>技能发现（副作用）</strong>：<code>discoverSkillDirsForPaths()</code> 火后不等——读文件时顺带激活相关 skill 目录</li>
+<li><strong>委托 <code>callInner()</code></strong>：实际读取，根据文件类型分支：<ul>
+<li><code>.ipynb</code> → notebook 解析</li>
+<li>图片扩展名 → base64 编码 + 尺寸压缩</li>
+<li>PDF → <code>readPDF()</code> 或 <code>extractPDFPages()</code></li>
+<li>其他 → 文本读取，支持 <code>offset</code>/<code>limit</code> 行范围</li>
+</ul>
+</li>
+<li><strong>ENOENT 回退</strong>：macOS 截图文件可能用细空格（U+202F），尝试替换后重试</li>
+</ol>
+<p><strong>返回值格式（<code>ToolResult&lt;Output&gt;</code> 的 data 部分）：</strong></p>
+<div class="code-block"><pre>// 文本文件
+{ type: 'text', file: { filePath, content, numLines, startLine, totalLines } }
+
+// 图片
+{ type: 'image', file: { base64, type, originalSize, dimensions? } }
+
+// Jupyter Notebook
+{ type: 'notebook', file: { filePath, cells } }
+
+// PDF（inline 模式）
+{ type: 'pdf', file: { filePath, base64, originalSize } }
+
+// PDF（提取为图片页面）
+{ type: 'parts', file: { filePath, originalSize, count, outputDir } }
+
+// 去重命中（文件未变化）
+{ type: 'file_unchanged', file: { filePath } }</pre></div><p><code>mapToolResultToToolResultBlockParam()</code> 将上述格式转换为 API <code>tool_result</code> 块。文本文件追加行号前缀和内存鲜度提示；图片以 base64 块发送；<code>file_unchanged</code> 发送一个常量 stub 文本（<code>FILE_UNCHANGED_STUB</code>）。</p>
+<hr>
+<h3>Q7：FileReadTool 的进度上报（onProgress）</h3>
+<p>FileReadTool <strong>不使用 <code>onProgress</code></strong>。其 <code>call()</code> 签名接收 <code>_canUseTool?</code> 和 <code>parentMessage?</code> 但 <code>onProgress</code> 未被接收（签名中省略了第五个参数）：</p>
+<div class="code-block"><pre>async call(
+  { file_path, offset = 1, limit = undefined, pages },
+  context,
+  _canUseTool?,   // 不使用
+  parentMessage?, // 用于 callInner 的 message ID
+  // onProgress 未声明——FileReadTool 没有中间进度
+)</pre></div><p><strong>原因</strong>：文件读取是原子操作，没有中间状态可以上报。UI 反馈通过以下方式实现：</p>
+<ul>
+<li><code>getActivityDescription(input)</code> 返回 <code>&quot;Reading {filePath}&quot;</code>，供 Spinner 显示</li>
+<li><code>renderToolUseMessage()</code> 立即渲染文件路径（流式渲染，input 流入时就显示）</li>
+<li>完成后 <code>renderToolResultMessage()</code> 显示 &quot;Read N lines&quot; 摘要</li>
+</ul>
+<p><strong>有 <code>onProgress</code> 上报的工具</strong>：AgentTool（上报子 agent 的每条消息）、BashTool（上报命令输出流）、WebSearchTool（上报搜索进度）。</p>
+<hr>
+<h3>Q8：AgentTool 的 <code>call()</code> 如何启动子 agent</h3>
+<p><strong>调用链（正常同步路径）：</strong></p>
+<div class="code-block"><pre>AgentTool.call()
+  ├── 验证 &amp; 路由（teammate spawn / fork / normal）
+  ├── 解析 selectedAgent（AgentDefinition）
+  ├── 构建 system prompt（fork 路径继承父 prompt，普通路径构建 agent 自己的）
+  ├── 构建 promptMessages（fork: buildForkedMessages()，普通: createUserMessage()）
+  ├── assembleToolPool() → worker 专属工具池
+  ├── 可选: createAgentWorktree() → worktree 隔离
+  ├── 构建 runAgentParams
+  └── shouldRunAsync ?
+      ├── [异步] registerAsyncAgent() → 注册后台任务
+      │           void runWithAgentContext(() =&gt; runAsyncAgentLifecycle({
+      │             makeStream: () =&gt; runAgent(runAgentParams)
+      │             ...
+      │           }))
+      │           return { status: 'async_launched', agentId, outputFile }
+      └── [同步] runAgent(runAgentParams) → AsyncIterator
+                  while (true) {
+                    const { result } = await Promise.race([
+                      agentIterator.next(),
+                      backgroundPromise  // 可能被 background
+                    ])
+                    onProgress(result)   // 上报每条消息
+                  }
+                  return { status: 'completed', result }</pre></div><p><strong><code>runAgent()</code> 是核心</strong>（<code>AgentTool/runAgent.ts</code>），它返回 <code>AsyncGenerator</code>，逐条 yield 子 agent 产生的消息（包括工具调用、工具结果、文本等）。</p>
+<hr>
+<h3>Q9：<code>forkSubagent.ts</code> 中，子 agent 继承 vs 隔离了什么</h3>
+<p><strong>Fork 子 agent 的核心设计思想</strong>：最大化 prompt cache 命中率，让所有并行 fork 共享相同的 API 请求前缀。</p>
+<p><strong>继承（子 agent 获得）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>隔离（子 agent 独立）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>Prompt Cache 最大化技巧</strong>（<code>forkSubagent.ts:107-168</code>）：</p>
+<ul>
+<li>所有 fork 子 agent 共享同一 assistant message（包含所有 tool_use 块）</li>
+<li>所有 fork 的 tool_result placeholder 文本完全相同（<code>&#39;Fork started — processing in background&#39;</code>）</li>
+<li>只有最后一个 text block（per-child directive）不同，所以 cache 命中率极高</li>
+</ul>
+<hr>
+<h3>Q10：父 agent 如何等待子 agent 完成</h3>
+<p><strong>同步子 agent（<code>shouldRunAsync = false</code>）：</strong></p>
+<p>使用 <strong>AsyncGenerator + Promise.race</strong>：</p>
+<div class="code-block"><pre>// AgentTool.tsx:846-892
+const agentIterator = runAgent({...})[Symbol.asyncIterator]()
+
+while (true) {
+  const nextMessagePromise = agentIterator.next()
+  const raceResult = backgroundPromise
+    ? await Promise.race([
+        nextMessagePromise.then(r =&gt; ({ type: 'message', result: r })),
+        backgroundPromise   // 可能随时变成 background
+      ])
+    : { type: 'message', result: await nextMessagePromise }
+
+  if (raceResult.type === 'background') {
+    // 转入后台继续执行，当前调用立即返回 async_launched
+    void runAsyncAgentLifecycle(...)
+    wasBackgrounded = true
+    break
+  }
+  // 正常消息：调用 onProgress 上报给父 agent 的 UI
+  onProgress({ toolUseID, data: { type: 'agent_progress', message: ... } })
+  if (raceResult.result.done) break
+}</pre></div><ul>
+<li><strong>模式</strong>：AsyncGenerator 迭代（Pull-based，每次 <code>next()</code> 拉取一条消息）</li>
+<li><strong>可中断</strong>：通过 <code>Promise.race([nextMessage, backgroundSignal])</code> 实现&quot;随时转后台&quot;</li>
+<li><strong>进度回调</strong>：每个 yielded 消息通过 <code>onProgress</code> 上报（不是轮询，不是事件发射器）</li>
+</ul>
+<p><strong>异步子 agent（<code>shouldRunAsync = true</code>）：</strong></p>
+<div class="code-block"><pre>// AgentTool.tsx:686-764
+registerAsyncAgent({...})  // 注册后台任务状态
+void runWithAgentContext(() =&gt; runAsyncAgentLifecycle({
+  makeStream: () =&gt; runAgent(runAgentParams),
+  ...
+}))
+// 立即返回
+return { data: { status: 'async_launched', agentId, outputFile } }</pre></div><p>父 agent 不等待；子 agent 在 void 中独立运行，结果写到 <code>outputFile</code>（<code>{taskId}.output</code>），父 agent 可通过 FileReadTool 读取进度文件轮询。</p>
+<hr>
+<h3>Q11：<code>useCanUseTool</code> 的完整决策流程</h3>
+<p><code>canUseTool</code> 是通过 <code>hasPermissionsToUseTool</code>（核心权限引擎）+ UI 层（交互式提示）组合实现的。</p>
+<p><strong><code>hasPermissionsToUseTool</code> 的流水线（<code>permissions.ts:473+</code>）：</strong></p>
+<div class="code-block"><pre>Step 0: abortController 已触发? → reject AbortError
+
+Step 1a: getDenyRuleForTool() → 整个工具被 deny 规则禁止?
+         是 → 返回 {behavior: 'deny', source: 'rule'}
+
+Step 1b: getAskRuleForTool() → 整个工具有 ask 规则?
+         是（且不能 sandbox auto-allow）→ 返回 {behavior: 'ask'}
+
+Step 1c: tool.checkPermissions(parsedInput, context)
+         → 工具自定义权限检查（如 BashTool 检查具体命令是否匹配 allow/deny 规则）
+
+Step 1d: tool.checkPermissions 返回 deny? → 透传 deny
+
+Step 1e: tool.requiresUserInteraction()? → 直接返回 ask（无法 bypass）
+
+Step 1f: checkPermissions 返回 content-level ask rule? → 透传 ask
+
+Step 1g: safetyCheck（.git/, .claude/, shell config 等保护路径）→ 强制 ask
+
+Step 2a: getToolAlwaysAllowRule() → 有 always-allow 规则?
+         是 → 返回 {behavior: 'allow'}
+
+Step 2b: bypassPermissions 模式? → 跳到 allow（除 safetyCheck）
+
+Step 2c: PermissionRequest hooks（PreToolUse hooks）→ hook 返回 allow/deny?
+
+Step 2d: acceptEdits 模式（只读工具）? → allow
+
+Step 3: 以上都未决定 → 返回 {behavior: 'ask'}（需要用户交互）</pre></div><p><strong><code>useCanUseTool</code> 中 UI 层的后续处理（<code>useCanUseTool.tsx</code>）：</strong></p>
+<div class="code-block"><pre>hasPermissionsToUseTool() 返回 allow → 直接 resolve，记录 decision('accept', 'config')
+
+hasPermissionsToUseTool() 返回 deny → resolve deny，记录 decision('reject', 'config')
+  - auto 模式: 追加 UI 通知（"denied by auto mode"）
+
+hasPermissionsToUseTool() 返回 ask:
+  ├── awaitAutomatedChecksBeforeDialog? → handleCoordinatorPermission()（等 classifier）
+  ├── handleSwarmWorkerPermission()（swarm worker 向 coordinator 请求批准）
+  └── handleInteractivePermission()
+      → 将确认请求放入 setToolUseConfirmQueue
+      → 等待用户在 PermissionRequest UI 中点击
+      → 用户选择后：
+          - "Allow once"  → allow（不保存）
+          - "Always allow" → allow + persistPermissionUpdates({destination: 'projectSettings', behavior: 'allow'})
+          - "Deny"         → deny（不保存）
+          - "Always deny"  → deny + persistPermissionUpdates({destination: 'projectSettings', behavior: 'deny'})</pre></div><p><strong>PermissionMode 对流程的影响：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h3>Q12：「记住此选择」的数据存储位置</h3>
+<p><strong>存储结构：</strong> <code>ToolPermissionRulesBySource</code>（按来源分层）</p>
+<div class="code-block"><pre>type ToolPermissionRulesBySource = {
+  userSettings?: PermissionRuleValue[]      // ~/.claude/settings.json
+  projectSettings?: PermissionRuleValue[]   // {projectRoot}/.claude/settings.json
+  localSettings?: PermissionRuleValue[]     // {projectRoot}/.claude/settings.local.json
+  policySettings?: PermissionRuleValue[]    // 组织策略（MDM 管理）
+  cliArg?: PermissionRuleValue[]            // --allow-tools 命令行参数
+  command?: PermissionRuleValue[]           // /permissions 命令临时添加
+  session?: PermissionRuleValue[]           // 本次会话内存中（不持久化）
+}</pre></div><p><strong>用户&quot;记住此选择&quot;时的实际写入：</strong></p>
+<ul>
+<li>用户点击 &quot;Always Allow&quot; / &quot;Always Deny&quot; → <code>persistPermissionUpdates([{type: &#39;addRules&#39;, destination: &#39;projectSettings&#39;, ...}])</code></li>
+<li>写入路径：<code>{projectRoot}/.claude/settings.json</code> 中的 <code>permissions.allow</code> 或 <code>permissions.deny</code> 数组</li>
+<li>同时调用 <code>context.setAppState()</code> 更新内存中的 <code>toolPermissionContext.alwaysAllowRules</code>（即时生效，下次调用同工具无需再问）</li>
+</ul>
+<p><strong>运行时位置：</strong> <code>AppState.toolPermissionContext.alwaysAllowRules / alwaysDenyRules</code>（<code>Tool.ts:126</code>），类型为 <code>ToolPermissionRulesBySource</code>（DeepImmutable）。</p>
+<p><strong>重要</strong>：<code>session</code> 来源的规则只存在内存中，进程重启后消失；<code>projectSettings</code> 来源的规则持久化在项目根目录，是最常见的&quot;记住此选择&quot;目标。</p>
+<hr>
+<h2>二、核心产出</h2>
+<h3>2.1 Tool 接口结构图（文字版）</h3>
+<div class="code-block"><pre>Tool&lt;Input, Output, Progress&gt; {
+  // ── 元数据 ──────────────────────────────────
+  name: string                          // 唯一标识，用于工具查找和权限规则匹配
+  aliases?: string[]                    // 向后兼容旧名称
+  searchHint?: string                   // ToolSearch 关键词（3-10 词）
+  maxResultSizeChars: number            // 超出后结果持久化到磁盘
+  strict?: boolean                      // API 严格模式
+  isMcp?: boolean                       // MCP 来源标志
+  shouldDefer?: boolean                 // 延迟加载（需 ToolSearch 激活）
+  alwaysLoad?: boolean                  // 始终出现在初始 prompt
+
+  // ── Schema ──────────────────────────────────
+  inputSchema: Input                    // Zod schema：输入校验 + 类型推断
+  inputJSONSchema?: ToolInputJSONSchema // MCP 工具备用（非 Zod）
+  outputSchema?: z.ZodType             // 输出 schema（可选）
+
+  // ── 动态描述 ────────────────────────────────
+  description(input, opts) → Promise&lt;string&gt;  // 权限提示文案
+  prompt(opts) → Promise&lt;string&gt;              // System prompt 贡献
+  userFacingName(input) → string             // UI 显示名称
+  getToolUseSummary(input) → string | null   // 紧凑视图摘要
+  getActivityDescription(input) → string | null // Spinner 文案
+
+  // ── 核心执行 ────────────────────────────────
+  call(args, ctx, canUseTool, parentMsg, onProgress?) → Promise&lt;ToolResult&lt;Output&gt;&gt;
+
+  // ── 能力声明 ────────────────────────────────
+  isEnabled() → boolean                 // 是否在当前环境可用
+  isConcurrencySafe(input) → boolean   // 是否可与其他工具并发执行
+  isReadOnly(input) → boolean          // 是否只读（影响权限检查）
+  isDestructive(input?) → boolean      // 是否不可逆（删除/覆盖/发送）
+  isSearchOrReadCommand(input) → {...}  // UI 折叠提示
+  isOpenWorld(input) → boolean         // 是否开放世界操作
+  requiresUserInteraction?() → boolean // 必须用户交互（无法 bypass）
+  interruptBehavior?() → 'cancel'|'block' // 新消息到来时行为
+
+  // ── 权限 ─────────────────────────────────────
+  validateInput(input, ctx) → Promise&lt;ValidationResult&gt;  // 输入合法性（在权限前）
+  checkPermissions(input, ctx) → Promise&lt;PermissionResult&gt; // 工具级权限检查
+  preparePermissionMatcher(input) → Promise&lt;(pattern) =&gt; bool&gt; // Hook if 条件
+  backfillObservableInput(input) → void // 钩子/权限系统看到 input 前预处理
+
+  // ── API 序列化 ───────────────────────────────
+  mapToolResultToToolResultBlockParam(output, toolUseID) → ToolResultBlockParam
+  toAutoClassifierInput(input) → unknown  // 安全分类器输入
+  extractSearchText(output) → string      // Transcript 搜索索引文本
+  isResultTruncated(output) → boolean     // 是否可展开
+
+  // ── UI 渲染 ──────────────────────────────────
+  renderToolUseMessage(input, opts) → ReactNode          // 工具调用时的 UI
+  renderToolResultMessage?(output, progress, opts) → ReactNode  // 结果 UI
+  renderToolUseProgressMessage?(progress, opts) → ReactNode     // 进度 UI
+  renderToolUseRejectedMessage?(input, opts) → ReactNode        // 拒绝 UI
+  renderToolUseErrorMessage?(result, opts) → ReactNode          // 错误 UI
+  renderGroupedToolUse?(toolUses, opts) → ReactNode | null      // 批量 UI
+  renderToolUseTag?(input) → ReactNode   // 附加标签（模型名、超时等）
+  renderToolUseQueuedMessage?() → ReactNode // 排队等待 UI
+
+  // ── 路径信息 ─────────────────────────────────
+  getPath?(input) → string             // 提取文件路径（供权限系统使用）
+  inputsEquivalent?(a, b) → boolean    // 输入等价判断（去重）
+}</pre></div><p><strong>工厂函数 <code>buildTool(def: ToolDef) → Tool</code></strong>：接受省略了 defaultable 方法的 <code>ToolDef</code>，填入安全默认值后返回完整 <code>Tool</code>。所有工具通过此函数构建，保证接口完整性。</p>
+<hr>
+<h3>2.2 模式卡片 #2：Tool 接口统一抽象</h3>
+<p><strong>问题：</strong> 如何让能力差异极大的工具（文件读取、Bash 执行、网络请求、子 agent 启动、MCP 代理）被模型以完全统一的方式调用，且能在权限系统、UI、序列化各层次无缝处理？</p>
+<p><strong>方案（基于代码的具体描述）：</strong></p>
+<ol>
+<li><strong>单一 <code>Tool&lt;Input, Output, Progress&gt;</code> 泛型接口</strong>（<code>Tool.ts:362</code>）——类型参数让每个工具的输入/输出/进度都有精确类型，但调用框架可以用 <code>Tool&lt;AnyObject, unknown&gt;</code> 统一持有。</li>
+<li><strong><code>buildTool()</code> + <code>ToolDef</code></strong>（<code>Tool.ts:783</code>）——工厂函数模式：工具只需声明自己的差异，安全默认值（fail-closed：<code>isConcurrencySafe=false</code>, <code>isReadOnly=false</code>, <code>checkPermissions=allow</code>）由框架统一填入，避免忘记实现关键方法。</li>
+<li><strong>JSON Schema (<code>ToolInputJSONSchema</code>) 作为 API 边界</strong>——MCP 工具可直接提供 JSON Schema，内置工具通过 Zod schema 自动转换。两种路径最终都生成标准的 JSON Schema 发给 API。</li>
+<li><strong><code>inputSchema</code> 用 Zod 而非纯 TypeScript 类型</strong>——Zod 同时提供：运行时校验（<code>tool.inputSchema.parse(input)</code>）+ 类型推断（<code>z.infer&lt;Input&gt;</code>）+ JSON Schema 生成（发给 API）。纯 TS 类型只存在编译时，无法做到三者合一。</li>
+<li><strong><code>mapToolResultToToolResultBlockParam()</code></strong>——每个工具自己知道如何将结构化输出序列化为 API <code>tool_result</code>，文本/图片/notebook 各有实现，框架无需知道内部结构。</li>
+</ol>
+<p><strong>关键设计决策：为什么 inputSchema 用 JSON Schema 而非 TypeScript 类型？</strong></p>
+<p>JSON Schema 是唯一能同时满足三个需求的格式：</p>
+<ul>
+<li><strong>运行时校验</strong>：<code>z.infer&lt;Input&gt;</code> 在 <code>call()</code> 前由框架调用 <code>tool.inputSchema.parse(input)</code> 验证模型输出的合法性</li>
+<li><strong>API 通信</strong>：模型调用工具时，框架需要把工具定义发给 Anthropic API，格式必须是 JSON Schema</li>
+<li><strong>文档生成</strong>：<code>description</code> 字段内嵌在 JSON Schema 中，模型从中理解每个参数的含义</li>
+</ul>
+<p>TypeScript 类型在编译后全部擦除，无法在运行时读取，更无法序列化发给 API。</p>
+<p><strong>适用条件：</strong> 需要将异构能力（文件 I/O、进程执行、网络、子系统调用）统一暴露给模型/框架/UI 时。</p>
+<p><strong>权衡：</strong></p>
+<ul>
+<li>优：接口统一，框架代码（权限、序列化、UI）只需面对 <code>Tool</code> 接口，不关心实现</li>
+<li>优：<code>buildTool()</code> 的默认值保证 fail-closed，新工具无法遗漏关键安全方法</li>
+<li>劣：接口过大（~40 个成员），实现完整工具需要大量样板代码</li>
+<li>劣：渲染方法（renderToolUseMessage 等）与执行逻辑耦合在同一接口，违反关注点分离</li>
+</ul>
+<hr>
+<h3>2.3 模式卡片 #3：进度上报与 UI 解耦</h3>
+<p><strong>问题：</strong> 工具执行时（如 AgentTool 运行子 agent、BashTool 执行长命令），如何将中间进度实时推送到 UI，且工具逻辑不依赖任何 UI 框架（如 React/Ink）？</p>
+<p><strong>方案（基于代码的具体描述）：</strong></p>
+<ol>
+<li><strong><code>onProgress?: ToolCallProgress&lt;P&gt;</code> 回调注入</strong>（<code>Tool.ts:384</code>）——框架在调用 <code>tool.call()</code> 时注入进度回调，工具内部调用 <code>onProgress({ toolUseID, data: P })</code> 上报进度。工具不持有任何 UI 引用。</li>
+<li><strong><code>ProgressMessage</code> 中间格式</strong>——<code>onProgress</code> 的数据先存入消息历史（<code>ProgressMessage&lt;ToolProgressData&gt;</code>），UI 组件从消息历史中读取，实现数据与视图的时序解耦。</li>
+<li><strong><code>renderToolUseProgressMessage(progressMessages, opts) → ReactNode</code></strong>——每个工具自定义如何将进度消息渲染为 React 节点。进度数据是纯数据，渲染逻辑封装在工具的渲染方法中。</li>
+<li><strong>AgentTool 的具体实现</strong>：子 agent 每产出一条消息，<code>runAgent</code> generator yield 该消息，AgentTool 的 while 循环收到后调用 <code>onProgress({ data: { type: &#39;agent_progress&#39;, message } })</code>，UI 的 <code>renderToolUseProgressMessage</code> 将其渲染为可折叠的消息列表。</li>
+</ol>
+<p><strong>关键设计决策：onProgress 回调 vs 事件发射器 vs 响应式流？</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>onProgress 回调是最轻量的解耦方案：工具代码保持纯函数风格，框架通过闭包注入 UI 更新逻辑，双方通过 <code>ToolProgressData</code> 类型契约通信。</p>
+<p><strong>适用条件：</strong> 执行时间超过秒级的工具；有自然的中间状态（每条命令输出、每条子 agent 消息）；工具逻辑希望与 UI 框架完全解耦。</p>
+<p><strong>权衡：</strong></p>
+<ul>
+<li>优：工具本身无 UI 依赖，可在非 UI 上下文（SDK、测试）中使用，进度回调直接 noop</li>
+<li>优：类型安全——<code>P extends ToolProgressData</code> 让每个工具的进度格式有精确类型</li>
+<li>劣：进度数据存入消息历史再读出，有一层间接性，增加调试复杂度</li>
+<li>劣：onProgress 是可选的（<code>?</code>），工具无法强制框架提供进度通道</li>
+</ul>
+<hr>
+<h2>三、关键洞察总结</h2>
+<h3>3.1 工具注册的三层过滤</h3>
+<div class="code-block"><pre>所有可能工具（getAllBaseTools）
+    ↓ 按 feature flag / env 条件导入
+已启用工具（compile-time / runtime gating）
+    ↓ filterToolsByDenyRules()
+未被 deny 规则整体禁止的工具
+    ↓ isEnabled() / REPL_ONLY_TOOLS 过滤
+    ↓ assembleToolPool() + MCP 工具合并
+本次会话的工具池（getTools + MCP）</pre></div><h3>3.2 权限系统的多层次</h3>
+<div class="code-block"><pre>Layer 1: 工具级规则（allow/deny 整个工具）
+Layer 2: 内容级规则（Bash(git *) / Read(~/.ssh/*)）
+Layer 3: 工具 checkPermissions（工具自定义逻辑）
+Layer 4: Safety checks（.git/, .claude/ 保护路径）
+Layer 5: Hooks（PreToolUse，外部进程判断）
+Layer 6: 用户交互（弹框确认 / always allow/deny → 持久化）
+Layer 7: 模式 override（bypassPermissions / dontAsk / auto）</pre></div><p>每层失败关闭（fail-closed）：不确定时 → ask，不是 allow。</p>
+<h3>3.3 子 agent 的状态边界</h3>
+<div class="code-block"><pre>父 agent 传递给子 agent：
+  ✓ 对话历史（messages）— fork 路径
+  ✓ System prompt（byte-exact，避免 GrowthBook 漂移）— fork 路径
+  ✓ 工具池（exact copy）— fork 路径
+  ✗ AppState（子 agent 有自己的 setAppState，异步子 agent 的是 no-op）
+  ✗ AbortController（后台子 agent 独立，不随父 ESC 取消）
+  ✗ toolPermissionContext.mode（子 agent 用 selectedAgent.permissionMode）</pre></div><p>这个设计使得子 agent 既能访问父 agent 的完整上下文（对话历史），又在执行环境上与父 agent 隔离（独立取消、独立权限模式）。</p>
+<hr>
+<p><em>精读完成，文件：<code>Task.ts</code>、<code>tools.ts</code>、<code>FileReadTool/</code>、<code>AgentTool/AgentTool.tsx</code>、<code>AgentTool/forkSubagent.ts</code>、<code>hooks/useCanUseTool.tsx</code>、<code>utils/permissions/permissions.ts</code></em></p>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

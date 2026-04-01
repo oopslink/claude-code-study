@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 2 · 数据结构 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-a$ <span style="color:var(--green)">cat task-02-data-structures.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 2：核心数据结构</h1>
+<blockquote>
+<p>研究日期：2026-03-31
+研究范围：消息类型体系、权限模型、Tool 抽象接口、系统上下文</p>
+<p><strong>重要说明</strong>：<code>src/types/message.ts</code> 和 <code>src/types/tools.ts</code>（进度数据类型）
+两个文件<strong>未包含在开源版本</strong>中。本笔记依据以下文件进行逆向重建：</p>
+<ul>
+<li><code>src/Tool.ts</code>（完整，包含 Tool/ToolUseContext 定义）</li>
+<li><code>src/types/permissions.ts</code>（完整）</li>
+<li><code>src/context.ts</code>（完整）</li>
+<li><code>src/utils/messages.ts</code>（工厂函数 + 类型使用推断消息结构）</li>
+<li><code>src/utils/messagePredicates.ts</code>（辨别式推断）</li>
+</ul>
+</blockquote>
+<hr>
+<h2>消息类型体系</h2>
+<h3>Message 类型 Union</h3>
+<p><code>Message</code> 是一个 discriminated union，通过 <code>type</code> 字段区分成员。
+根据 <code>messages.ts</code> 中 switch/filter 分支与 <code>isSystemLocalCommandMessage</code> 等谓词函数推断，完整成员如下：</p>
+<div class="code-block"><pre>// 推断自 src/utils/messages.ts 的使用模式
+// 实际定义在（缺失的）src/types/message.ts
+
+type Message =
+  | UserMessage               // type: 'user'
+  | AssistantMessage          // type: 'assistant'
+  | ProgressMessage           // type: 'progress'
+  | AttachmentMessage         // type: 'attachment'
+  | SystemMessage             // type: 'system'（多子类型）
+  | TombstoneMessage          // type: 'tombstone'
+  | ToolUseSummaryMessage     // type: 'tool_use_summary'（SDK-only）
+  | StreamEvent               // type: 'stream_event'（流式中间态）
+  | RequestStartEvent         // type: 'stream_request_start'（流式请求开始）</pre></div><h3>各消息类型关键字段</h3>
+<h4>UserMessage（type: &#39;user&#39;）</h4>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>关键辨别</strong>：<code>isHumanTurn(m)</code> = <code>m.type === &#39;user&#39; &amp;&amp; !m.isMeta &amp;&amp; m.toolUseResult === undefined</code>
+即 <code>UserMessage</code> 同时承担&quot;人类对话轮次&quot;和&quot;工具结果回传&quot;两种角色。</p>
+<h4>AssistantMessage（type: &#39;assistant&#39;）</h4>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ToolUseBlock</strong>（<code>BetaToolUseBlock</code>，来自 Anthropic SDK）：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ToolResultBlock</strong>（<code>ToolResultBlockParam</code>，来自 Anthropic SDK）：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h4>ProgressMessage（type: &#39;progress&#39;）</h4>
+<div class="code-block"><pre>// 推断自 createProgressMessage 工厂函数
+type ProgressMessage&lt;P extends Progress = Progress&gt; = {
+  type: 'progress'
+  uuid: UUID
+  timestamp: string
+  toolUseID: string        // 所属工具调用 ID
+  parentToolUseID: string  // 父工具调用 ID（用于嵌套 Agent）
+  data: P                  // 进度数据（ToolProgressData | HookProgress）
+}</pre></div><h4>SystemMessage（type: &#39;system&#39;）</h4>
+<p>有多个 <code>subtype</code> 子类型：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>所有 SystemMessage 共有字段：<code>type: &#39;system&#39;</code>、<code>subtype</code>、<code>uuid</code>、<code>timestamp</code>、<code>content</code>、<code>isMeta</code>、<code>level</code>（部分子类型）。</p>
+<h3>ProgressMessage vs AssistantMessage</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ProgressMessage 何时产生</strong>：工具执行期间，通过 <code>onProgress?: ToolCallProgress&lt;P&gt;</code> 回调发射。
+典型场景：AgentTool 的子 Agent 进度、BashTool 的实时输出、MCP 工具的流式响应等。</p>
+<h3>SystemLocalCommandMessage 是什么？</h3>
+<div class="code-block"><pre>// 推断自 createCommandInputMessage 工厂函数
+type SystemLocalCommandMessage = {
+  type: 'system'
+  subtype: 'local_command'
+  content: string      // 命令输出文本
+  level: 'info'
+  timestamp: string
+  uuid: UUID
+  isMeta: false
+}</pre></div><p><strong>使用场景</strong>：当用户在 REPL 中执行本地斜杠命令（slash command）时，命令的 stdout 被包装为 <code>SystemLocalCommandMessage</code>。</p>
+<p><strong>特殊之处</strong>：它是 <code>SystemMessage</code> 的子类型，但在 <code>normalizeMessagesForAPI</code> 时被特殊处理——转为 <code>UserMessage</code> 发给模型，使模型能引用命令输出。因此 <code>appendSystemMessage</code> 类型上排除了它（<code>Exclude&lt;SystemMessage, SystemLocalCommandMessage&gt;</code>），需要走单独路径注入。</p>
+<hr>
+<h2>权限模型</h2>
+<h3>PermissionMode 取值</h3>
+<p>来源：<code>src/types/permissions.ts</code></p>
+<div class="code-block"><pre>export const EXTERNAL_PERMISSION_MODES = [
+  'acceptEdits',        // 自动接受文件编辑，仍询问其他操作
+  'bypassPermissions',  // 跳过所有权限检查（危险）
+  'default',            // 标准交互模式，询问用户
+  'dontAsk',            // 自动拒绝所有需要许可的操作
+  'plan',               // 计划模式，只输出计划不执行
+] as const
+
+// 内部模式（用户可寻址）= 外部模式 + 条件特性
+type InternalPermissionMode = ExternalPermissionMode | 'auto' | 'bubble'
+type PermissionMode = InternalPermissionMode</pre></div><div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><code>PERMISSION_MODES</code>（运行时用户可设置集合）= <code>INTERNAL_PERMISSION_MODES</code>，不含 <code>bubble</code>。</p>
+<h3>PermissionResult 结构</h3>
+<div class="code-block"><pre>// src/types/permissions.ts
+
+// 基础行为决策
+type PermissionBehavior = 'allow' | 'deny' | 'ask'
+
+// 完整决策类型
+type PermissionDecision&lt;Input&gt; =
+  | PermissionAllowDecision&lt;Input&gt;   // behavior: 'allow'
+  | PermissionAskDecision&lt;Input&gt;     // behavior: 'ask'
+  | PermissionDenyDecision           // behavior: 'deny'
+
+// 最终结果（Decision + passthrough）
+type PermissionResult&lt;Input&gt; =
+  | PermissionDecision&lt;Input&gt;
+  | { behavior: 'passthrough'; message: string; ... }</pre></div><p>四种决策结果详解：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>PermissionDecisionReason</strong> 的 type 取值：
+<code>rule</code>、<code>mode</code>、<code>subcommandResults</code>、<code>permissionPromptTool</code>、<code>hook</code>、<code>asyncAgent</code>、<code>sandboxOverride</code>、<code>classifier</code>、<code>workingDir</code>、<code>safetyCheck</code>、<code>other</code></p>
+<h3>AdditionalWorkingDirectory 是什么？</h3>
+<div class="code-block"><pre>// src/types/permissions.ts
+type AdditionalWorkingDirectory = {
+  path: string
+  source: WorkingDirectorySource  // 与 PermissionRuleSource 同义
+}</pre></div><p><strong>作用</strong>：扩展权限检查的&quot;工作目录范围&quot;。当工具操作（如文件读写）的路径位于 cwd 之外时，通过 <code>additionalWorkingDirectories</code> 声明额外允许的目录，避免误报越权。</p>
+<p><strong>出现在</strong> <code>ToolPermissionContext.additionalWorkingDirectories: ReadonlyMap&lt;string, AdditionalWorkingDirectory&gt;</code>，key 为路径字符串。</p>
+<hr>
+<h2>Tool 抽象接口</h2>
+<h3>Tool 完整字段定义</h3>
+<p>来源：<code>src/Tool.ts</code></p>
+<div class="code-block"><pre>// 泛型参数：
+// Input  = Zod schema 类型（工具输入）
+// Output = 工具返回值类型
+// P      = 进度数据类型（extends ToolProgressData）
+
+type Tool&lt;Input extends AnyObject, Output, P extends ToolProgressData&gt; = {
+
+  // ── 标识 ──────────────────────────────────────────────
+  readonly name: string                    // 工具名，全局唯一
+  aliases?: string[]                       // 历史名称兼容（改名时用）
+  searchHint?: string                      // 关键词提示（deferred 工具的搜索辅助）
+
+  // ── Schema ────────────────────────────────────────────
+  readonly inputSchema: Input              // Zod schema（定义输入结构）
+  readonly inputJSONSchema?: ToolInputJSONSchema  // MCP 工具的原始 JSON Schema
+  outputSchema?: z.ZodType&lt;unknown&gt;        // 输出 schema（可选）
+
+  // ── 核心执行 ──────────────────────────────────────────
+  call(
+    args: z.infer&lt;Input&gt;,
+    context: ToolUseContext,
+    canUseTool: CanUseToolFn,
+    parentMessage: AssistantMessage,
+    onProgress?: ToolCallProgress&lt;P&gt;,
+  ): Promise&lt;ToolResult&lt;Output&gt;&gt;
+
+  // ── 权限 ──────────────────────────────────────────────
+  checkPermissions(
+    input: z.infer&lt;Input&gt;,
+    context: ToolUseContext,
+  ): Promise&lt;PermissionResult&gt;
+
+  validateInput?(
+    input: z.infer&lt;Input&gt;,
+    context: ToolUseContext,
+  ): Promise&lt;ValidationResult&gt;
+
+  // ── 能力描述（用于系统提示） ───────────────────────────
+  description(
+    input: z.infer&lt;Input&gt;,
+    options: { isNonInteractiveSession: boolean; toolPermissionContext; tools },
+  ): Promise&lt;string&gt;
+
+  prompt(options: {
+    getToolPermissionContext: () =&gt; Promise&lt;ToolPermissionContext&gt;
+    tools: Tools
+    agents: AgentDefinition[]
+    allowedAgentTypes?: string[]
+  }): Promise&lt;string&gt;
+
+  // ── 状态查询 ──────────────────────────────────────────
+  isEnabled(): boolean
+  isConcurrencySafe(input: z.infer&lt;Input&gt;): boolean
+  isReadOnly(input: z.infer&lt;Input&gt;): boolean
+  isDestructive?(input: z.infer&lt;Input&gt;): boolean
+  isOpenWorld?(input: z.infer&lt;Input&gt;): boolean
+  requiresUserInteraction?(): boolean
+
+  // ── 分类 / 元数据 ─────────────────────────────────────
+  readonly maxResultSizeChars: number       // 结果超过此大小持久化到磁盘
+  readonly strict?: boolean                 // 启用严格 schema 验证
+  readonly shouldDefer?: boolean            // 是否延迟加载（需先 ToolSearch）
+  readonly alwaysLoad?: boolean             // 始终在初始 prompt 中加载
+  isMcp?: boolean                          // 是否是 MCP 工具
+  isLsp?: boolean                          // 是否是 LSP 工具
+  mcpInfo?: { serverName: string; toolName: string }  // MCP 服务器信息
+
+  // ── 输入处理 ──────────────────────────────────────────
+  inputsEquivalent?(a: z.infer&lt;Input&gt;, b: z.infer&lt;Input&gt;): boolean
+  backfillObservableInput?(input: Record&lt;string, unknown&gt;): void
+  getPath?(input: z.infer&lt;Input&gt;): string
+  preparePermissionMatcher?(
+    input: z.infer&lt;Input&gt;,
+  ): Promise&lt;(pattern: string) =&gt; boolean&gt;
+
+  // ── 中断行为 ──────────────────────────────────────────
+  interruptBehavior?(): 'cancel' | 'block'
+
+  // ── 分类器输入 ────────────────────────────────────────
+  toAutoClassifierInput(input: z.infer&lt;Input&gt;): unknown
+
+  // ── 序列化 ────────────────────────────────────────────
+  mapToolResultToToolResultBlockParam(
+    content: Output,
+    toolUseID: string,
+  ): ToolResultBlockParam
+
+  extractSearchText?(out: Output): string
+
+  // ── UI 渲染（React） ───────────────────────────────────
+  userFacingName(input: Partial&lt;z.infer&lt;Input&gt;&gt; | undefined): string
+  userFacingNameBackgroundColor?(input: ...): keyof Theme | undefined
+  renderToolUseMessage(input: Partial&lt;z.infer&lt;Input&gt;&gt;, options): React.ReactNode
+  renderToolResultMessage?(content, progressMessages, options): React.ReactNode
+  renderToolUseProgressMessage?(progressMessages, options): React.ReactNode
+  renderToolUseQueuedMessage?(): React.ReactNode
+  renderToolUseRejectedMessage?(input, options): React.ReactNode
+  renderToolUseErrorMessage?(result, options): React.ReactNode
+  renderGroupedToolUse?(toolUses, options): React.ReactNode | null
+  renderToolUseTag?(input: ...): React.ReactNode
+
+  // ── 搜索 / 折叠显示 ────────────────────────────────────
+  isSearchOrReadCommand?(input: ...): { isSearch: boolean; isRead: boolean; isList?: boolean }
+  isResultTruncated?(output: Output): boolean
+  isTransparentWrapper?(): boolean
+  getToolUseSummary?(input: ...): string | null
+  getActivityDescription?(input: ...): string | null
+}</pre></div><p><strong>buildTool 默认值</strong>（<code>TOOL_DEFAULTS</code>）：</p>
+<ul>
+<li><code>isEnabled</code> → <code>true</code></li>
+<li><code>isConcurrencySafe</code> → <code>false</code>（保守默认：不安全）</li>
+<li><code>isReadOnly</code> → <code>false</code>（保守默认：写操作）</li>
+<li><code>isDestructive</code> → <code>false</code></li>
+<li><code>checkPermissions</code> → <code>{ behavior: &#39;allow&#39;, updatedInput }</code> （委托给通用权限系统）</li>
+<li><code>toAutoClassifierInput</code> → <code>&#39;&#39;</code>（跳过 classifier，安全相关工具须覆盖）</li>
+<li><code>userFacingName</code> → <code>name</code></li>
+</ul>
+<h3>ToolUseContext 关键字段</h3>
+<p>来源：<code>src/Tool.ts</code>，<code>ToolUseContext</code> 是工具执行时获得的完整运行时上下文：</p>
+<div class="code-block"><pre>type ToolUseContext = {
+  // 选项配置（启动时确定）
+  options: {
+    commands: Command[]
+    debug: boolean
+    mainLoopModel: string
+    tools: Tools
+    verbose: boolean
+    thinkingConfig: ThinkingConfig
+    mcpClients: MCPServerConnection[]
+    mcpResources: Record&lt;string, ServerResource[]&gt;
+    isNonInteractiveSession: boolean
+    agentDefinitions: AgentDefinitionsResult
+    maxBudgetUsd?: number
+    customSystemPrompt?: string
+    appendSystemPrompt?: string
+    querySource?: QuerySource
+    refreshTools?: () =&gt; Tools
+  }
+
+  // 核心运行时状态
+  abortController: AbortController   // 中止信号
+  messages: Message[]                // 完整对话历史
+  readFileState: FileStateCache       // 文件读取缓存
+
+  // 应用状态管理
+  getAppState(): AppState
+  setAppState(f: (prev: AppState) =&gt; AppState): void
+  setAppStateForTasks?: (f: (prev: AppState) =&gt; AppState) =&gt; void
+
+  // UI 回调
+  setToolJSX?: SetToolJSXFn
+  addNotification?: (notif: Notification) =&gt; void
+  appendSystemMessage?: (msg: Exclude&lt;SystemMessage, SystemLocalCommandMessage&gt;) =&gt; void
+  sendOSNotification?: (opts: { message: string; notificationType: string }) =&gt; void
+
+  // 工具执行追踪
+  setInProgressToolUseIDs: (f: (prev: Set&lt;string&gt;) =&gt; Set&lt;string&gt;) =&gt; void
+  setHasInterruptibleToolInProgress?: (v: boolean) =&gt; void
+  setResponseLength: (f: (prev: number) =&gt; number) =&gt; void
+
+  // Agent 标识（子 Agent 时有值）
+  agentId?: AgentId
+  agentType?: string
+
+  // 权限与安全
+  requireCanUseTool?: boolean
+  localDenialTracking?: DenialTrackingState
+  toolDecisions?: Map&lt;string, { source; decision; timestamp }&gt;
+
+  // 资源限制
+  fileReadingLimits?: { maxTokens?: number; maxSizeBytes?: number }
+  globLimits?: { maxResults?: number }
+
+  // 其他
+  contentReplacementState?: ContentReplacementState
+  renderedSystemPrompt?: SystemPrompt
+  userModified?: boolean
+  toolUseId?: string
+  queryTracking?: QueryChainTracking
+  requestPrompt?: (sourceName, toolInputSummary?) =&gt; (request) =&gt; Promise&lt;PromptResponse&gt;
+  handleElicitation?: (serverName, params, signal) =&gt; Promise&lt;ElicitResult&gt;
+  // ... 更多 UI/追踪字段
+}</pre></div><p><strong>最关键字段</strong>（工具执行必须依赖的）：</p>
+<ol>
+<li><code>abortController</code> — 支持用户中断</li>
+<li><code>messages</code> — 读取对话历史上下文</li>
+<li><code>options.tools</code> — 工具列表（AgentTool 启动子 Agent 需要）</li>
+<li><code>setAppState</code> — 更新应用状态（TodoWrite 等工具写入结果）</li>
+<li><code>setInProgressToolUseIDs</code> — 追踪工具执行状态（UI 动画）</li>
+</ol>
+<h3>Tools 类型（复数）和 Tool 的关系</h3>
+<div class="code-block"><pre>// src/Tool.ts
+type Tools = readonly Tool[]</pre></div><p><code>Tools</code> 是 <code>Tool[]</code> 的只读版本，语义上代表&quot;工具集合&quot;。使用独立类型别名而非直接用 <code>Tool[]</code> 的目的：</p>
+<ul>
+<li>明确标记工具集合在哪里被组装、传递、过滤</li>
+<li><code>readonly</code> 防止运行时意外修改工具列表</li>
+<li>便于在 codebase 中 grep 工具集合的流转路径</li>
+</ul>
+<p><strong>工具集组装入口</strong>：<code>assembleToolPool(permissionContext, mcpTools)</code> in <code>src/tools.ts</code>，返回内置工具 + MCP 工具的去重有序集合。</p>
+<hr>
+<h2>系统上下文</h2>
+<p>来源：<code>src/context.ts</code></p>
+<h3>getSystemContext()</h3>
+<div class="code-block"><pre>export const getSystemContext = memoize(async (): Promise&lt;{ [k: string]: string }&gt;) =&gt; {
+  return {
+    gitStatus,      // git 状态快照（branch、status、log、user）
+    cacheBreaker,   // [仅 ant] 缓存破坏标记
+  }
+}</pre></div><p><strong>内容</strong>：</p>
+<ul>
+<li><code>gitStatus</code>：当前 git 仓库状态（分支、修改文件、最近 5 次提交、git user）。当 <code>CLAUDE_CODE_REMOTE=true</code> 或 git 指令被禁用时跳过。</li>
+<li><code>cacheBreaker</code>：Anthropic 内部 <code>BREAK_CACHE_COMMAND</code> feature 启用时的调试注入。</li>
+</ul>
+<p><strong>用途</strong>：注入系统提示的开头（system turn），向模型提供当前工程上下文。<strong>memoize</strong> 确保同一对话内只读取一次 git。</p>
+<h3>getUserContext()</h3>
+<div class="code-block"><pre>export const getUserContext = memoize(async (): Promise&lt;{ [k: string]: string }&gt;) =&gt; {
+  return {
+    claudeMd,    // CLAUDE.md 内容（工程记忆文件）
+    currentDate, // 今天的日期（ISO格式）
+  }
+}</pre></div><p><strong>内容</strong>：</p>
+<ul>
+<li><code>claudeMd</code>：从项目目录和 <code>~/.claude/</code> 收集的所有 CLAUDE.md 文件内容，合并后注入。通过 <code>CLAUDE_CODE_DISABLE_CLAUDE_MDS</code> 或 <code>--bare</code> 模式可禁用。</li>
+<li><code>currentDate</code>：<code>Today&#39;s date is YYYY-MM-DD.</code> 格式的当前日期字符串。</li>
+</ul>
+<p><strong>用途</strong>：注入用户轮次（user turn 开头），以 <code>&lt;system-reminder&gt;</code> 标签包裹。<code>claudeMd</code> 内容同时被缓存供 auto-mode classifier（yoloClassifier.ts）读取，避免循环依赖。</p>
+<p><strong>两者区别</strong>：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>关键发现</h2>
+<h3>1. types/message.ts 和 types/tools.ts 是有意剥离的私有文件</h3>
+<p>这两个关键类型文件未包含在开源版本中，但被 180+ 个文件引用。推测原因：这些类型文件与 Anthropic 内部业务逻辑（消息结构演化、SDK 版本适配、内部扩展字段）紧密绑定，对外开源会带来接口承诺风险。开发者可通过 factory functions（<code>createUserMessage</code>、<code>createAssistantMessage</code> 等）理解实际结构。</p>
+<h3>2. UserMessage 承担双重角色——人类输入 AND 工具结果</h3>
+<p><code>UserMessage</code>（<code>type: &#39;user&#39;</code>）同时用于：</p>
+<ul>
+<li>人类对话轮次（<code>isMeta = undefined, toolUseResult = undefined</code>）</li>
+<li>工具结果回传（<code>toolUseResult !== undefined</code>，content 含 <code>tool_result</code> block）</li>
+</ul>
+<p>这是 Anthropic API 设计决定的——API 层面 tool_result 必须在 user 角色消息中。Claude Code 在内部通过 <code>isHumanTurn()</code> 谓词区分两者，避免把工具结果当成用户输入。</p>
+<h3>3. ProgressMessage 是纯 UI 临时消息，永远不进入 API</h3>
+<p><code>type: &#39;progress&#39;</code> 消息在 <code>normalizeMessagesForAPI</code> 时被完全过滤，仅用于实时进度展示。这种设计让工具的进度报告与 API 调用解耦：工具可以任意频率发射进度，不影响 token 消耗和 API 请求的稳定性。</p>
+<h3>4. Tool 接口混合了执行逻辑与 UI 渲染——有意为之的全栈设计</h3>
+<p><code>Tool</code> 接口中包含 15+ 个 <code>render*</code> 方法（React 组件返回）和 <code>call()</code> 执行方法。这种将渲染逻辑内聚到工具对象的设计，使得每个工具完全自治——无需外部分发表来决定如何渲染。代价是 Tool 接口极重（~70个字段），但 <code>buildTool()</code> 工厂函数通过 <code>TOOL_DEFAULTS</code> 填充安全默认值，保证工具作者只需关注差异化实现。</p>
+<h3>5. 权限系统采用分层决策，passthrough 是关键的透传语义</h3>
+<p><code>PermissionResult</code> 的四种行为（allow/ask/deny/passthrough）中，<code>passthrough</code> 是一个专门的&quot;我不决定，让上层决定&quot;的元结果，与 <code>ask</code> 不同——<code>ask</code> 会产生 UI 提示，而 <code>passthrough</code> 是工具链中间层向上冒泡权限问题的机制，体现了多层工具嵌套（如 AgentTool 包含 BashTool）时的权限委托设计。</p>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

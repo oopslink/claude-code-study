@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 1 · 启动流程 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-a$ <span style="color:var(--green)">cat task-01-startup.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 1：启动流程与运行模式</h1>
+<h2>启动并行化</h2>
+<h3>问题 1：系统启动时哪几件事是并行执行的？</h3>
+<p>Claude Code 在启动过程中有多处并行化设计，分布在两个层次：</p>
+<h4>层次一：模块加载阶段的并行（main.tsx 顶部，第 12-20 行）</h4>
+<p>文件最开头连续触发三件事（注释明确说明这些必须在所有其他 import 之前运行）：</p>
+<ol>
+<li><p><strong><code>profileCheckpoint(&#39;main_tsx_entry&#39;)</code></strong>（第 12 行）
+在任何模块开始加载前打下时间戳，目的是测量 import 阶段耗时。</p>
+</li>
+<li><p><strong><code>startMdmRawRead()</code></strong>（第 16 行）
+启动 MDM（Mobile Device Management）子进程（macOS 上是 <code>plutil</code>，Windows 上是 <code>reg query</code>）。这些子进程读取企业管控策略，耗时约数十 ms。提前触发使其与后续 ~135ms 的 import 加载时间重叠。</p>
+</li>
+<li><p><strong><code>startKeychainPrefetch()</code></strong>（第 20 行）
+同时触发两个 macOS keychain 读取（OAuth token + 旧版 API key）。注释说明：如果串行执行，<code>isRemoteManagedSettingsEligible()</code> 内部会通过同步 spawn 顺序读取这两个值，耗时约 65ms；并行化后这个开销近乎消失。</p>
+</li>
+</ol>
+<p><strong>为什么并行而不串行？</strong> 这三件事都是 I/O 密集型（磁盘读取、子进程启动），与 JS 模块加载（CPU 密集型）相互独立，可以完全重叠。子进程在 135ms 的模块加载期间就已完成，等到 preAction hook 调用 <code>ensureKeychainPrefetchCompleted()</code> 时几乎不需要等待。</p>
+<h4>层次二：action handler 中的 setup + commands 并行（main.tsx 第 1927-1929 行）</h4>
+<div class="code-block"><pre>const setupPromise = setup(preSetupCwd, ...)
+const commandsPromise = worktreeEnabled ? null : getCommands(preSetupCwd)
+const agentDefsPromise = worktreeEnabled ? null : getAgentDefinitionsWithOverrides(preSetupCwd)</pre></div><ul>
+<li><strong><code>setup()</code></strong> 主要耗时在 <code>startUdsMessaging()</code>（socket 绑定，约 20ms）——不是磁盘密集型，不与文件读取竞争。</li>
+<li><strong><code>getCommands()</code></strong> 从磁盘扫描命令文件。</li>
+<li><strong><code>getAgentDefinitionsWithOverrides()</code></strong> 扫描 agent 定义文件。</li>
+</ul>
+<p>三者同时启动，最后由 <code>await setupPromise</code> 串行等待（因为 commands 需要知道最终 cwd，若 --worktree 模式下 setup 会 chdir，所以 worktree 启用时禁用此并行，见第 1928 行注释）。</p>
+<h4>层次三：preAction hook 中的并行等待（第 914 行）</h4>
+<div class="code-block"><pre>await Promise.all([ensureMdmSettingsLoaded(), ensureKeychainPrefetchCompleted()])</pre></div><p>等待层次一启动的两个后台任务完成。</p>
+<hr>
+<h3>问题 2：<code>profileCheckpoint</code> 出现了几次？它的作用是什么？</h3>
+<p>在 <code>main.tsx</code> 中共出现 <strong>42 次</strong>，setup.ts 中再出现 <strong>3 次</strong>（共 45 次）。</p>
+<p>主要出现位置（main.tsx）：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>作用（见 <code>src/utils/startupProfiler.ts</code>）：</strong></p>
+<ol>
+<li><strong>性能监控</strong>：使用 <code>performance.mark()</code> 记录各阶段时间戳，计算相邻 checkpoint 之间的耗时。</li>
+<li><strong>分级输出</strong>：<ul>
+<li>详细模式（<code>CLAUDE_CODE_PROFILE_STARTUP=1</code>）：输出完整时间线报告 + 内存快照，写入 <code>~/.claude/startup-perf/&lt;session-id&gt;.txt</code>。</li>
+<li>统计采样模式（ant 用户 100%，外部用户 0.5%）：将各阶段耗时上报到 Statsig（<code>logEvent(&#39;tengu_startup_perf&#39;, ...)</code>）。</li>
+</ul>
+</li>
+<li><strong>阶段定义</strong>（<code>PHASE_DEFINITIONS</code>，startupProfiler.ts 第 49-54 行）：<ul>
+<li><code>import_time</code>：cli_entry → main_tsx_imports_loaded</li>
+<li><code>init_time</code>：init_function_start → init_function_end</li>
+<li><code>settings_time</code>：eagerLoadSettings_start → eagerLoadSettings_end</li>
+<li><code>total_time</code>：cli_entry → main_after_run</li>
+</ul>
+</li>
+</ol>
+<p><strong>setup.ts 中出现 3 次</strong>（第 306 行 <code>setup_before_prefetch</code>，第 381 行 <code>setup_after_prefetch</code> 及其他位置），用于标记预取前后及相关阶段的时间点。</p>
+<hr>
+<h2>Feature Flags</h2>
+<h3>问题 3：<code>feature(&#39;COORDINATOR_MODE&#39;)</code> 控制的是哪个模块？</h3>
+<p><strong>文件：</strong> <code>main.tsx</code> 第 76 行</p>
+<div class="code-block"><pre>const coordinatorModeModule = feature('COORDINATOR_MODE')
+  ? require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js')
+  : null;</pre></div><p>控制的是 <code>src/coordinator/coordinatorMode.js</code> 模块。</p>
+<p><strong>这个模块做什么：</strong> 协调器模式（Coordinator Mode）是一种特殊的工具过滤机制，用于多智能体协作场景中的&quot;协调器&quot;角色。当 <code>CLAUDE_CODE_COORDINATOR_MODE</code> 环境变量设置时（main.tsx 第 1872 行），对 headless 路径的工具列表执行 <code>applyCoordinatorToolFilter()</code>，从工具集中移除不适合协调器角色使用的工具。协调器专注于任务分派和结果汇总，而不直接执行低层次操作。</p>
+<hr>
+<h3>问题 4：<code>feature(&#39;KAIROS&#39;)</code> 控制的是哪个模块？</h3>
+<p><strong>文件：</strong> <code>main.tsx</code> 第 80-81 行</p>
+<div class="code-block"><pre>const assistantModule = feature('KAIROS')
+  ? require('./assistant/index.js') as typeof import('./assistant/index.js')
+  : null;
+const kairosGate = feature('KAIROS')
+  ? require('./assistant/gate.js') as typeof import('./assistant/gate.js')
+  : null;</pre></div><p>控制 <code>src/assistant/index.js</code> 和 <code>src/assistant/gate.js</code> 两个模块。</p>
+<p><strong>KAIROS 对应的功能——&quot;assistant mode&quot;（助理模式）：</strong>
+这是一种特殊的交互模式，让 Claude Code 作为&quot;助理&quot;嵌入到用户的工作流中（类似 Cursor/VSCode 中的常驻侧边栏 AI）。代码中明确标记 KAIROS 为 &quot;assistant mode&quot;（main.tsx 第 78 行注释）。从代码行为来看：</p>
+<ul>
+<li><code>assistant: true</code>（设置在 <code>.claude/settings.json</code> 中）+ GrowthBook gate <code>tengu_kairos</code> 开启时激活。</li>
+<li>激活后强制开启 <code>brief</code> 模式（简洁回应），设置 <code>kairosActive=true</code>（第 1081 行），并预初始化一个 agent team（第 1086 行）。</li>
+<li>支持 <code>claude assistant [sessionId]</code> 子命令来 attach 到正在运行的 bridge session（第 4335 行）。</li>
+<li><code>_pendingAssistantChat</code> 对象（第 559-562 行）追踪命令行中 <code>claude assistant</code> 子命令的参数。</li>
+</ul>
+<hr>
+<h3>问题 5：条件 require 与普通 import 有何不同？</h3>
+<p>这两个 feature flag 使用的都是<strong>条件式同步 <code>require()</code></strong>，而非顶级 <code>import</code>：</p>
+<div class="code-block"><pre>// Dead code elimination: conditional import for COORDINATOR_MODE
+/* eslint-disable @typescript-eslint/no-require-imports */
+const coordinatorModeModule = feature('COORDINATOR_MODE')
+  ? require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js')
+  : null;</pre></div><p><strong>特别之处：</strong></p>
+<ol>
+<li><p><strong>Dead code elimination（死代码消除）</strong>：注释明确说明目的是 &quot;Dead code elimination&quot;。<code>feature()</code> 来自 <code>bun:bundle</code>，是构建期常量——Bun 打包时若 <code>COORDINATOR_MODE</code> 为 false，整个 <code>require(...)</code> 分支会被静态裁剪，模块代码完全不进入产物。这对于只发布给特定用户的功能（如 ant 内部功能）可以减小二进制体积。</p>
+</li>
+<li><p><strong>与普通 <code>import</code> 的对比：</strong></p>
+<ul>
+<li>普通 <code>import</code> 是<strong>静态声明</strong>，无论如何都会加载模块（包括其所有依赖），无法按条件剔除。</li>
+<li><code>require()</code> 是<strong>运行时调用</strong>，配合 <code>feature()</code> 的构建期求值，可实现真正的条件编译效果。</li>
+<li>副作用：普通 import 在模块图解析阶段执行 side effects；条件 require 只在运行时分支成立时才执行。</li>
+</ul>
+</li>
+<li><p><strong>类型安全的妥协</strong>：使用 <code>as typeof import(...)</code> 保留 TypeScript 类型信息（类型级 import 不影响运行时），同时保持 <code>require()</code> 的运行时条件性——这是一种兼顾类型安全和 tree-shaking 的常见模式。</p>
+</li>
+</ol>
+<hr>
+<h2>运行模式</h2>
+<h3>问题 6：系统有哪几种运行模式？</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>运行模式判定逻辑（main.tsx 第 800-803 行）：</strong></p>
+<div class="code-block"><pre>const hasPrintFlag = cliArgs.includes('-p') || cliArgs.includes('--print')
+const hasInitOnlyFlag = cliArgs.includes('--init-only')
+const hasSdkUrl = cliArgs.some(arg =&gt; arg.startsWith('--sdk-url'))
+const isNonInteractive = hasPrintFlag || hasInitOnlyFlag || hasSdkUrl || !process.stdout.isTTY</pre></div><p>这些条件变量先在 main 函数顶部统一计算（共同判定逻辑），然后在各个 action handler 的入口处读取判定结果，决定走 <code>runHeadless()</code>（非交互）还是 <code>launchRepl()</code>（交互式 REPL）的入口。最终通过 <code>isNonInteractive</code> 这一条件分岔，路由到不同的执行引擎。</p>
+<hr>
+<h2>初始化流程</h2>
+<h3>问题 7：<code>src/setup.ts</code> 设置了哪些全局状态？</h3>
+<p><code>setup()</code> 函数（setup.ts）设置的全局状态：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>此外，<code>src/main.tsx</code> 的 action handler 在调用 <code>setup()</code> 前/后还设置：</p>
+<ul>
+<li><code>setIsInteractive(isInteractive)</code> 第 812 行</li>
+<li><code>setClientType(clientType)</code> 第 834 行</li>
+<li><code>setSessionSource(&#39;remote-control&#39;)</code> 第 847 行</li>
+<li><code>setKairosActive(true)</code> 第 1081 行（KAIROS 激活时）</li>
+<li><code>setSessionBypassPermissionsMode()</code> 第 1398 行</li>
+</ul>
+<hr>
+<h3>问题 8：配置文件从哪里加载？查找顺序是什么？</h3>
+<p><strong>配置来源（<code>src/utils/settings/constants.ts</code> 第 7-22 行，后定义的优先级更高）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong><code>policySettings</code> 的内部优先级（settings.ts 第 322-395 行，同样后者覆盖前者）：</strong></p>
+<ol>
+<li>文件：<code>&lt;managed-dir&gt;/managed-settings.json</code> + <code>managed-settings.d/*.json</code>（需要 admin 权限写入）</li>
+<li>注册表/plist：macOS plist 或 Windows HKLM 注册表（MDM 管控）</li>
+<li>远程：从 Anthropic API 获取的远程管理设置（最高优先级）</li>
+</ol>
+<p><strong>特殊机制：</strong></p>
+<ul>
+<li><code>--setting-sources user,project,local</code> 可以显式限制加载哪些来源（init.ts 相关）。</li>
+<li><code>flagSettings</code> 和 <code>policySettings</code> 始终加载，不受 <code>--setting-sources</code> 控制（constants.ts 第 163-166 行）。</li>
+<li>Cowork 模式下 <code>userSettings</code> 改读 <code>~/.claude/cowork_settings.json</code>（settings.ts 第 264-272 行）。</li>
+<li>配置加载使用缓存（<code>settingsCache.ts</code>），<code>resetSettingsCache()</code> 可强制重新读取。</li>
+</ul>
+<hr>
+<h2>关键发现</h2>
+<ol>
+<li><p><strong>&quot;启动热路径&quot;的极致优化</strong>：Claude Code 将 3 件 I/O 密集型任务（MDM 子进程、keychain 读取、模块加载）并行化到文件顶部——这 3 行代码甚至早于其他 <code>import</code> 语句执行（靠 ESM hoisting 之前的副作用时机），充分利用了约 135ms 的模块加载窗口。这种设计思路值得在其他长启动链路的 CLI 工具中借鉴。</p>
+</li>
+<li><p><strong><code>feature()</code> = 编译期开关，不是运行期 if</strong>：<code>bun:bundle</code> 的 <code>feature()</code> 在 Bun 打包时求值为常量，使得整个模块分支可被死代码消除。这解释了为什么 COORDINATOR_MODE 和 KAIROS 等功能不会增加外部发布版本的体积，同时在内部版本中完整可用。</p>
+</li>
+<li><p><strong>两条主干路径的分叉点</strong>：整个运行模式的核心判断在 main.tsx 第 800-803 行，仅 4 行代码决定了后续走交互式 REPL 还是 headless 管道流。<code>--sdk-url</code> 的存在使得&quot;SDK 模式&quot;本质上是 headless 模式的特化，而不是独立的第三条路径。</p>
+</li>
+<li><p><strong>setup.ts 是 cwd 的&quot;守门人&quot;</strong>：注释反复强调 <code>setCwd()</code> 必须在所有依赖 cwd 的代码之前调用（setup.ts 第 160 行注释），hook 配置必须在 <code>setCwd()</code> 之后捕获快照（第 164 行注释），worktree 的 cwd 切换必须在 commands 并行加载之前完成（main.tsx 第 1928 行注释）。这说明 cwd 是整个系统的隐式全局依赖，任何乱序都会导致 hook/plugin 加载路径错误。</p>
+</li>
+<li><p><strong>配置的分层覆盖模型体现了&quot;最小特权 + 可管控&quot;原则</strong>：用户设置 &lt; 项目设置 &lt; 本地设置 &lt; CLI 参数 &lt; 企业管控。企业管控（policySettings）始终加载且优先级最高，但普通用户可以用 <code>--settings</code> 在不影响共享配置的前提下临时覆盖。这种设计使个人、团队、企业三种使用场景都能平滑支持。</p>
+</li>
+<li><p><strong>代码中确认的内部术语</strong>：Tengu 是 Claude Code 的内部代号（在代码中用于内部分析和性能上报函数名 <code>logTenguInit</code>），KAIROS 是 &quot;assistant mode&quot; 的特性名（代码注释明确标记）。这两个术语出现在代码注释和函数名中，用于区分内部功能集。</p>
+</li>
+</ol>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

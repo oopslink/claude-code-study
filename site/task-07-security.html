@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 7 · 安全沙箱 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-b$ <span style="color:var(--green)">cat task-07-security.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 07：安全与沙箱系统深度精读</h1>
+<blockquote>
+<p>精读时间：2026-03-31
+核心问题：Claude Code 如何防止 LLM 生成的 bash 命令破坏用户系统？</p>
+</blockquote>
+<hr>
+<h2>一、必答问题解析</h2>
+<h3>AST 基础</h3>
+<p><strong>Q1：<code>ast.ts</code> 定义了哪些主要的 AST 节点类型？</strong></p>
+<p><code>ast.ts</code> 使用 tree-sitter-bash 的节点类型体系，核心类型分两组：</p>
+<p><strong>结构性节点（STRUCTURAL_TYPES）</strong> — 递归遍历时透明穿过：</p>
+<ul>
+<li><code>program</code> — 根节点（整个脚本）</li>
+<li><code>list</code> — 由 <code>&amp;&amp;</code>、<code>||</code> 或 <code>;</code> 连接的命令序列</li>
+<li><code>pipeline</code> — 管道 <code>a | b</code></li>
+<li><code>redirected_statement</code> — 命令 + 重定向的组合节点</li>
+</ul>
+<p><strong>危险节点（DANGEROUS_TYPES）</strong> — 出现即触发 <code>too-complex</code>，放弃静态分析：</p>
+<ul>
+<li><code>command_substitution</code> — <code>$(…)</code> 命令替换</li>
+<li><code>process_substitution</code> — <code>&lt;(…)</code> / <code>&gt;(…)</code> 进程替换</li>
+<li><code>expansion</code> / <code>simple_expansion</code> — <code>${var}</code> / <code>$var</code> 参数展开</li>
+<li><code>brace_expression</code> — <code>{a,b}</code> brace 展开</li>
+<li><code>subshell</code> — <code>(…)</code> 子 shell</li>
+<li><code>for_statement</code> / <code>while_statement</code> / <code>until_statement</code> / <code>if_statement</code> / <code>case_statement</code> — 控制流</li>
+<li><code>function_definition</code> — 函数定义</li>
+<li><code>ansi_c_string</code> — <code>$&#39;...&#39;</code> ANSI-C 字符串（可编码任意字符）</li>
+<li><code>heredoc_redirect</code> / <code>herestring_redirect</code> — heredoc</li>
+</ul>
+<p><strong>叶节点（正常命令词）</strong>：</p>
+<ul>
+<li><code>command</code> — 一条简单命令</li>
+<li><code>variable_assignment</code> — <code>VAR=value</code> 赋值</li>
+<li><code>declaration_command</code> — <code>export</code>/<code>local</code>/<code>declare</code>/<code>typeset</code>/<code>readonly</code></li>
+<li><code>negated_command</code> — <code>! cmd</code></li>
+<li><code>file_redirect</code> — <code>&gt;file</code>、<code>&lt;file</code> 等重定向（操作符类型：<code>&gt;</code>、<code>&gt;&gt;</code>、<code>&lt;</code>、<code>&gt;&amp;</code>、<code>&lt;&amp;</code>、<code>&gt;|</code>、<code>&amp;&gt;</code>、<code>&amp;&gt;&gt;</code>、<code>&lt;&lt;&lt;</code>）</li>
+<li><code>comment</code> — 注释（直接跳过）</li>
+</ul>
+<p>关键导出类型（在 <code>ast.ts</code> 开头定义）：</p>
+<div class="code-block"><pre>export type SimpleCommand = {
+  argv: string[]
+  envVars: { name: string; value: string }[]
+  redirects: Redirect[]
+  text: string
+}
+
+export type ParseForSecurityResult =
+  | { kind: 'simple'; commands: SimpleCommand[] }
+  | { kind: 'too-complex'; reason: string; nodeType?: string }
+  | { kind: 'parse-unavailable' }</pre></div><hr>
+<p><strong>Q2：为什么需要 AST 而不是字符串正则匹配？</strong></p>
+<p><strong>核心原因：字符串正则无法处理解析差异（parser differential）</strong>。</p>
+<p>经典例子——brace 展开绕过权限检查：</p>
+<div class="code-block"><pre>git ls-remote {--upload-pack="touch /tmp/test",test}</pre></div><ul>
+<li><strong>正则视角</strong>：看到一个参数 <code>{--upload-pack=&quot;touch /tmp/test&quot;,test}</code>，是一个字符串整体，不包含任何危险模式</li>
+<li><strong>bash 实际执行</strong>：brace 展开后等价于 <code>git ls-remote --upload-pack=&quot;touch /tmp/test&quot; test</code>，其中 <code>--upload-pack=&quot;touch /tmp/test&quot;</code> 会执行任意命令</li>
+</ul>
+<p>AST 分析在这里能做到的事：在 tree-sitter 树中发现 <code>brace_expression</code> 节点，直接返回 <code>too-complex</code>，要求用户确认，而不是错误地认为命令安全。</p>
+<p>另一个典型例子（文件中注释有详细说明）：</p>
+<div class="code-block"><pre>VAR="-rf /" &amp;&amp; rm $VAR</pre></div><ul>
+<li><strong>正则</strong>：扫描到 <code>rm</code>，检查其后是否有 <code>-rf /</code>，看不到（因为参数是 <code>$VAR</code>）</li>
+<li><strong>AST</strong>：发现 <code>simple_expansion($VAR)</code> 节点，<code>BARE_VAR_UNSAFE_RE</code> 检测到变量值包含空格（word splitting 风险），返回 <code>too-complex</code></li>
+</ul>
+<p><strong>设计核心原则</strong>：<code>ast.ts</code> 的注释写明——这是 <strong>FAIL-CLOSED</strong> 设计：任何未被明确 allowlist 的 AST 节点类型，都触发 <code>too-complex</code>，迫使走权限提示流程。</p>
+<hr>
+<h3>bashSecurity.ts（安全检查核心）</h3>
+<p><strong>Q3：<code>bashSecurity.ts</code> 的主入口函数及签名？</strong></p>
+<p>旧路径（regex/shell-quote，已标记 <code>@deprecated</code>）：</p>
+<div class="code-block"><pre>export function bashCommandIsSafe_DEPRECATED(command: string): PermissionResult</pre></div><p>新路径（AST + tree-sitter）入口在 <code>ast.ts</code>：</p>
+<div class="code-block"><pre>export async function parseForSecurity(cmd: string): Promise&lt;ParseForSecurityResult&gt;
+export function parseForSecurityFromAst(
+  cmd: string,
+  root: Node | typeof PARSE_ABORTED,
+): ParseForSecurityResult</pre></div><p><code>bashPermissions.ts</code> 中实际使用的入口是 <code>checkCommandAndSuggestRules()</code>，在其内部调用 <code>bashCommandIsSafeAsync</code>（即 <code>bashCommandIsSafeAsync_DEPRECATED</code> 的别名）。</p>
+<p><code>PermissionResult</code> 返回类型（定义于 <code>src/types/permissions.ts</code>）：</p>
+<div class="code-block"><pre>type PermissionResult =
+  | { behavior: 'allow'; updatedInput: ...; decisionReason: ... }
+  | { behavior: 'deny'; message: string; decisionReason: ... }
+  | { behavior: 'ask'; message: string; suggestions?: ...; isBashSecurityCheckForMisparsing?: boolean; ... }
+  | { behavior: 'passthrough'; message: string; ... }</pre></div><hr>
+<p><strong>Q4：<code>bashSecurity.ts</code> 检测了哪些具体危险操作？</strong></p>
+<p>文件定义了 23 个安全检查 ID（<code>BASH_SECURITY_CHECK_IDS</code>），按类别梳理：</p>
+<p><strong>注入与命令替换（Shell Injection）</strong></p>
+<ul>
+<li><code>DANGEROUS_PATTERNS_COMMAND_SUBSTITUTION</code>(8)：检测 <code>$()</code>, <code>`</code>, <code>&lt;()</code>, <code>&gt;()</code>, <code>=()</code> 等进程/命令替换（含 Zsh 特有语法）</li>
+<li><code>BACKSLASH_ESCAPED_OPERATORS</code>(21)：反斜杠转义操作符 <code>\;</code>、<code>\|</code>，可隐藏命令结构</li>
+<li><code>COMMENT_QUOTE_DESYNC</code>(22)：<code>#</code> 注释内含引号字符，可导致后续 quote tracker 状态错乱</li>
+<li><code>QUOTED_NEWLINE</code>(23)：引号内换行后的下一行以 <code>#</code> 开头，可绕过 <code>stripCommentLines</code> 行处理</li>
+</ul>
+<p><strong>解析差异（Parser Differential）</strong></p>
+<ul>
+<li><code>MALFORMED_TOKEN_INJECTION</code>(14)：未闭合的分隔符，shell-quote 和 bash 解析不一致</li>
+<li><code>BACKSLASH_ESCAPED_WHITESPACE</code>(15)：<code>\&lt;空格&gt;</code> 让 tree-sitter 和 bash 对 word boundaries 的理解不同</li>
+<li><code>UNICODE_WHITESPACE</code>(18)：Unicode 空白字符（NBSP 等），肉眼不可见但影响解析</li>
+<li><code>MID_WORD_HASH</code>(19)：中间位置的 <code>#</code>，shell-quote 当注释处理，bash 当字面字符</li>
+<li><code>CONTROL_CHARACTERS</code>(17)：控制字符（null byte 等），bash 静默丢弃但会绕过检查器</li>
+</ul>
+<p><strong>变量与重定向</strong></p>
+<ul>
+<li><code>DANGEROUS_VARIABLES</code>(6)：变量出现在重定向或管道上下文 <code>&lt; $VAR</code>、<code>$VAR |</code></li>
+<li><code>IFS_INJECTION</code>(11)：使用 <code>$IFS</code> 可绕过 word-split 验证</li>
+<li><code>DANGEROUS_PATTERNS_INPUT_REDIRECTION</code>(9)：输入重定向 <code>&lt;</code>（可读敏感文件）</li>
+<li><code>DANGEROUS_PATTERNS_OUTPUT_REDIRECTION</code>(10)：输出重定向 <code>&gt;</code>（可覆盖任意文件）</li>
+</ul>
+<p><strong>Zsh 特有危险</strong></p>
+<ul>
+<li><code>ZSH_DANGEROUS_COMMANDS</code>(20)：<code>zmodload</code>、<code>emulate</code>、<code>sysopen</code>、<code>ztcp</code>、<code>zpty</code> 等，可绕过二进制权限检查</li>
+<li>Zsh <code>=cmd</code> equals expansion（在 <code>COMMAND_SUBSTITUTION_PATTERNS</code> 中）：<code>=curl evil.com</code> 展开为 <code>/usr/bin/curl</code>，绕过 <code>Bash(curl:*)</code> deny 规则</li>
+</ul>
+<p><strong>混淆技术（Obfuscation）</strong></p>
+<ul>
+<li><code>OBFUSCATED_FLAGS</code>(4)：ANSI-C quoting <code>$&#39;...&#39;</code>，空引号拼接 <code>&#39;&#39;-exec</code>，相邻空引号与 dash <code>&quot;&quot;&quot;-f&quot;</code> 等</li>
+<li><code>BRACE_EXPANSION</code>(16)：<code>{a,b}</code> 或 <code>{a..b}</code> brace 展开，可将多个 flag 隐藏为一个词</li>
+<li><code>SHELL_METACHARACTERS</code>(5)：引号内含 <code>;</code>、<code>|</code>、<code>&amp;</code></li>
+</ul>
+<p><strong>特定命令</strong></p>
+<ul>
+<li><code>JQ_SYSTEM_FUNCTION</code>(2)：<code>jq</code> 的 <code>system()</code> 函数可执行任意命令</li>
+<li><code>JQ_FILE_ARGUMENTS</code>(3)：<code>jq</code> 的 <code>-f</code>/<code>--from-file</code>/<code>--rawfile</code> 可读取任意文件为 jq 代码</li>
+<li><code>GIT_COMMIT_SUBSTITUTION</code>(12)：git commit 消息中含 <code>$()</code> 或 <code>`</code></li>
+<li><code>PROC_ENVIRON_ACCESS</code>(13)：访问 <code>/proc/self/environ</code> 等，可泄漏环境变量</li>
+<li><code>NEWLINES</code>(7)：未引用的换行分隔符（可隐藏多条命令）</li>
+<li><code>INCOMPLETE_COMMANDS</code>(1)：以 <code>-</code>、<code>&amp;&amp;</code>、<code>||</code>、<code>;</code> 开头的碎片命令</li>
+</ul>
+<hr>
+<p><strong>Q5：当检测到危险操作时，返回的数据结构？</strong></p>
+<div class="code-block"><pre>// 典型 ask 结果
+{
+  behavior: 'ask',
+  message: 'Command contains $() command substitution',
+  // 可选字段：
+  isBashSecurityCheckForMisparsing?: boolean,  // 标记为解析差异问题，会在 bashPermissions 早期拦截
+  suggestions?: PermissionUpdate[],
+  pendingClassifierCheck?: { command, cwd, descriptions }
+}
+
+// 明确拒绝
+{
+  behavior: 'deny',
+  message: 'Permission to use Bash with command X has been denied.',
+  decisionReason: { type: 'rule', rule: PermissionRule }
+}</pre></div><p><code>isBashSecurityCheckForMisparsing: true</code> 是一个重要标记：表示触发原因是 shell-quote 和 bash 之间的解析差异（而非仅仅是&quot;危险&quot;），<code>bashToolHasPermission</code> 中会在 <code>splitCommand</code> 处理之前就拦截这类命令。</p>
+<hr>
+<h3>bashPermissions.ts（权限规则引擎）</h3>
+<p><strong>Q6：权限规则的数据结构？</strong></p>
+<div class="code-block"><pre>// 核心规则类型（src/types/permissions.ts）
+type PermissionRule = {
+  source: PermissionRuleSource  // 'userSettings' | 'projectSettings' | 'session' | 'cliArg' | ...
+  ruleBehavior: PermissionBehavior  // 'allow' | 'deny' | 'ask'
+  ruleValue: PermissionRuleValue  // { toolName: string; ruleContent?: string }
+}
+
+// ToolPermissionContext 是运行时规则容器
+type ToolPermissionContext = {
+  mode: PermissionMode  // 'default' | 'acceptEdits' | 'bypassPermissions' | ...
+  alwaysAllowRules: ToolPermissionRulesBySource  // { userSettings?: string[], session?: string[], ... }
+  alwaysDenyRules: ToolPermissionRulesBySource
+  alwaysAskRules: ToolPermissionRulesBySource
+  additionalWorkingDirectories: ReadonlyMap&lt;string, AdditionalWorkingDirectory&gt;
+  isBypassPermissionsModeAvailable: boolean
+  ...
+}</pre></div><p>Bash 规则内容（<code>ruleContent</code>）的语法，由 <code>shellRuleMatching.ts</code> 解析：</p>
+<ul>
+<li>精确匹配：<code>git status</code> → 仅匹配这一条确切命令</li>
+<li>前缀匹配：<code>git commit:*</code> → 匹配所有以 <code>git commit</code> 开头的命令</li>
+<li>通配符：<code>npm run *</code> → 支持 glob 模式匹配</li>
+</ul>
+<hr>
+<p><strong>Q7：规则匹配的优先级顺序？</strong></p>
+<p><strong>Deny 优先于 Ask 优先于 Allow</strong>，精确匹配优先于前缀/通配符匹配。</p>
+<p><code>bashToolCheckPermission()</code> 中明文写出的 8 步决策树：</p>
+<div class="code-block"><pre>1. 精确匹配 deny 规则 → deny
+2. 精确匹配 ask 规则  → ask
+3. 精确匹配 allow 规则 → （暂存，待后续 path check 通过后用）
+4. 前缀/通配符 deny 规则 → deny
+5. 前缀/通配符 ask 规则  → ask
+6. 路径约束检查（checkPathConstraints）
+7. 前缀/通配符 allow 规则 → allow
+8. sed 约束检查
+9. 模式检查（checkPermissionMode）
+10. 只读检查（BashTool.isReadOnly）→ allow
+11. passthrough → 触发权限提示弹窗</pre></div><p><strong>Deny 规则和 Ask 规则使用更激进的 env var 剥离</strong>（<code>stripAllEnvVars: true</code>）：</p>
+<ul>
+<li>确保 <code>FOO=bar denied_command</code> 依然能匹配 <code>Bash(denied_command:*)</code> 的 deny 规则</li>
+<li>而 allow 规则只剥离白名单中的安全 env var（<code>SAFE_ENV_VARS</code>），防止 <code>DOCKER_HOST=evil.com docker ps</code> 绕过 <code>Bash(docker ps:*)</code> 的 allow 规则</li>
+</ul>
+<hr>
+<p><strong>Q8：用户自定义规则存储在哪里？如何加载？</strong></p>
+<p><strong>存储位置</strong>（按来源 <code>PermissionRuleSource</code>）：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>加载方式</strong>：通过 <code>extractRules()</code> 从各来源的 settings JSON 中读取 <code>alwaysAllow</code>、<code>alwaysDeny</code>、<code>alwaysAsk</code> 字段，整合进 <code>ToolPermissionContext</code>，在每次权限检查时通过 <code>getRuleByContentsForTool()</code> 查询。</p>
+<hr>
+<h3>readOnlyValidation.ts（只读模式）</h3>
+<p><strong>Q9：只读模式的命令白名单有哪些？</strong></p>
+<p><code>readOnlyValidation.ts</code> 的 <code>COMMAND_ALLOWLIST</code> 包含以下命令族（每个命令有精细的安全 flag 白名单）：</p>
+<p><strong>系统工具</strong>：<code>xargs</code>、<code>file</code>、<code>sed</code>（只读模式：无 <code>-i</code> 原地修改）、<code>sort</code>、<code>man</code>、<code>help</code>、<code>netstat</code>、<code>ps</code></p>
+<p><strong>Git 操作</strong>（<code>GIT_READ_ONLY_COMMANDS</code>，来自 <code>readOnlyCommandValidation.ts</code>）：
+<code>git status</code>、<code>git log</code>、<code>git diff</code>、<code>git show</code>、<code>git branch</code>、<code>git remote</code>、<code>git stash list</code>、<code>git tag</code>、<code>git ls-files</code>、<code>git grep</code> 等（约 30+ 个只读子命令）</p>
+<p><strong>外部工具</strong>：</p>
+<ul>
+<li><code>GH_READ_ONLY_COMMANDS</code>：<code>gh pr list</code>、<code>gh issue list</code>、<code>gh repo view</code> 等（ant 内部）</li>
+<li><code>EXTERNAL_READONLY_COMMANDS</code>：<code>cat</code>、<code>ls</code>、<code>echo</code>、<code>grep</code>、<code>find</code>、<code>head</code>、<code>tail</code>、<code>wc</code>、<code>stat</code>、<code>pwd</code>、<code>which</code>、<code>type</code>、<code>env</code>、<code>printenv</code> 等基础命令</li>
+<li><code>DOCKER_READ_ONLY_COMMANDS</code>：<code>docker ps</code>、<code>docker inspect</code>、<code>docker logs</code>、<code>docker images</code> 等</li>
+<li><code>RIPGREP_READ_ONLY_COMMANDS</code>：<code>rg</code> 相关（含详细 flag 控制，排除 <code>--replace</code> 等修改操作）</li>
+<li><code>PYRIGHT_READ_ONLY_COMMANDS</code>：静态类型检查命令</li>
+</ul>
+<p><strong>常用只读命令列表（来自 COMMAND_ALLOWLIST）：</strong></p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<p><strong>Q10：判断一个命令是否只读的算法步骤？</strong></p>
+<p>入口在 <code>BashTool.isReadOnly(input)</code> → <code>checkReadOnlyConstraints()</code>，算法如下：</p>
+<ol>
+<li><p><strong>提取并剥离 Redirects</strong>：调用 <code>extractOutputRedirections()</code> 分离输出重定向（<code>&gt;</code>/<code>&gt;&gt;</code>/<code>&amp;&gt;</code> 等）。有输出重定向 → 非只读，立即返回 false</p>
+</li>
+<li><p><strong>拆分复合命令</strong>：调用 <code>splitCommand_DEPRECATED()</code> 将 <code>&amp;&amp;</code>、<code>||</code>、<code>;</code> 分隔的命令拆成子命令列表</p>
+</li>
+<li><p><strong>对每个子命令</strong>：
+a. 剥离安全 wrapper（<code>timeout</code>、<code>nohup</code>、<code>nice</code> 等）和安全 env var 前缀
+b. 提取 base command（第一个词）
+c. 在 <code>COMMAND_ALLOWLIST</code> 中查找该 base command
+d. 未找到 → 非只读</p>
+</li>
+<li><p><strong>Flag 验证</strong>（<code>validateFlags()</code>）：</p>
+<ul>
+<li>解析命令参数列表</li>
+<li>对每个 flag，检查是否在该命令的 <code>safeFlags</code> Record 中</li>
+<li>验证 flag 的参数类型（<code>&#39;none&#39;</code> / <code>&#39;string&#39;</code> / <code>&#39;number&#39;</code> / <code>&#39;char&#39;</code> / 特定字面量）</li>
+<li>遇到不在白名单的 flag → 非只读</li>
+</ul>
+</li>
+<li><p><strong>额外回调验证</strong>（<code>additionalCommandIsDangerousCallback</code>）：</p>
+<ul>
+<li>如 <code>sed</code> 会调用 <code>sedCommandIsAllowedByAllowlist()</code>，检查 sed 的表达式是否只包含读取操作（无 <code>w</code> 写操作、无原地修改）</li>
+</ul>
+</li>
+<li><p>所有检查通过 → 只读</p>
+</li>
+</ol>
+<hr>
+<h3>文件系统权限</h3>
+<p><strong>Q11：<code>filesystem.ts</code> 的 <code>pathInWorkingPath()</code> 如何防止路径逃逸？</strong></p>
+<p>核心防御函数是 <code>pathInWorkingPath(path, workingPath)</code>：</p>
+<div class="code-block"><pre>export function pathInWorkingPath(path: string, workingPath: string): boolean {
+  const absolutePath = expandPath(path)          // 展开 ~，但不解析 symlink
+  const absoluteWorkingPath = expandPath(workingPath)
+
+  // 处理 macOS symlink 常见映射
+  // /var -&gt; /private/var,  /tmp -&gt; /private/tmp
+  const normalizedPath = absolutePath
+    .replace(/^\/private\/var\//, '/var/')
+    .replace(/^\/private\/tmp(\/|$)/, '/tmp$1')
+  const normalizedWorkingPath = absoluteWorkingPath
+    .replace(...)
+
+  // case-insensitive（防止 macOS/Windows 大小写绕过）
+  const caseNormalizedPath = normalizeCaseForComparison(normalizedPath)
+  const caseNormalizedWorkingPath = normalizeCaseForComparison(normalizedWorkingPath)
+
+  // 计算相对路径
+  const relative = relativePath(caseNormalizedWorkingPath, caseNormalizedPath)
+
+  if (relative === '') return true  // 同一路径
+
+  if (containsPathTraversal(relative)) return false  // 包含 `..`
+
+  return !posix.isAbsolute(relative)  // 相对路径（在工作目录内）
+}</pre></div><p><strong><code>containsPathTraversal(relative)</code></strong> 是关键：检测相对路径中是否含有 <code>..</code> 分量，有则拒绝。</p>
+<p><strong>多路径检查机制</strong>：<code>pathInAllowedWorkingPath()</code> 会同时检查<strong>原始路径</strong>和所有 <strong>symlink 解析后的路径</strong>（通过 <code>getPathsForPermissionCheck(path)</code> 获取，调用 <code>realpathSync</code> 解析 symlink chain）。两路径都必须在工作目录内才允许访问，防止通过 symlink 逃逸。</p>
+<p><strong>危险路径额外检查</strong>（<code>checkPathSafetyForAutoEdit()</code>）：</p>
+<ul>
+<li><code>hasSuspiciousWindowsPathPattern()</code>：NTFS ADS（<code>::$DATA</code>）、8.3 短名（<code>GIT~1</code>）、长路径前缀（<code>\\?\</code>）、三点路径（<code>...</code>）、UNC 路径</li>
+<li><code>isDangerousFilePathToAutoEdit()</code>：<code>.git/</code>、<code>.vscode/</code>、<code>.idea/</code>、<code>.claude/</code>、<code>.bashrc</code>、<code>.gitconfig</code> 等（case-insensitive 比较）</li>
+<li><code>isClaudeConfigFilePath()</code>：Claude 自身配置文件始终需要确认</li>
+</ul>
+<hr>
+<h2>二、多层防御架构图</h2>
+<div class="code-block"><pre>用户/LLM 提交 bash 命令
+  │
+  ▼
+[前置：模式检查 checkPermissionMode]
+  系统是否处于 bypassPermissions 模式？
+  acceptEdits 模式？
+  │
+  ▼
+[层 1：精确/前缀规则匹配 — deny/ask 优先]
+  文件：bashPermissions.ts → bashToolCheckExactMatchPermission()
+  ├── 查 alwaysDenyRules：匹配 → 直接 deny（用户明确禁止的命令）
+  ├── 查 alwaysAskRules：匹配 → ask（用户要求每次确认）
+  └── 查 alwaysAllowRules：匹配 → 暂存，继续往下做 path 检查
+  │
+  ▼
+[层 2：AST 静态安全分析]
+  文件：ast.ts → parseForSecurity() → parseForSecurityFromAst()
+  旧路径：bashSecurity.ts → bashCommandIsSafe_DEPRECATED()（tree-sitter 不可用时）
+  ├── Pre-checks（字符级）：控制字符、Unicode 空白、反斜杠空格、Zsh 语法
+  ├── tree-sitter 解析 bash AST（50ms 超时，50,000 节点预算）
+  ├── FAIL-CLOSED 遍历：未知节点类型 → too-complex → ask
+  ├── 危险节点：command_substitution/brace_expression/expansion 等 → too-complex
+  ├── 变量作用域跟踪：检测 VAR="-rf /" &amp;&amp; rm $VAR 模式
+  └── 结果：
+      ├── simple（含各子命令的 argv[] 和 redirects）→ 继续
+      ├── too-complex → ask（需用户确认）
+      └── parse-unavailable → 降级到 regex 路径
+  │
+  ▼  (too-complex 时也走 regex 路径作为 fallback)
+[层 2b：正则补充安全检查 bashSecurity.ts]
+  检测 23 类 pattern（obfuscated flags、IFS injection、proc environ、
+  mid-word hash、comment quote desync、brace expansion 等）
+  → 任一命中 → behavior='ask'，部分标记 isBashSecurityCheckForMisparsing=true
+  │
+  ▼
+[层 3：路径约束检查]
+  文件：pathValidation.ts → checkPathConstraints()
+  ├── 提取命令中所有文件路径参数
+  ├── pathInAllowedWorkingPath()：是否在工作目录范围内
+  │     ├── 原始路径 + symlink 解析路径双重检查
+  │     └── containsPathTraversal() 阻断 ../.. 逃逸
+  ├── checkPathSafetyForAutoEdit()：危险文件（.bashrc/.gitconfig/.claude/）
+  └── hasSuspiciousWindowsPathPattern()：NTFS ADS、UNC 路径等
+  │
+  ▼
+[层 4：只读模式检查（acceptEdits 模式激活时）]
+  文件：readOnlyValidation.ts → checkReadOnlyConstraints()
+  ├── 无输出重定向（&gt; &gt;&gt; &amp;&gt;）
+  ├── base command 在 COMMAND_ALLOWLIST 中
+  ├── 所有 flag 在 safeFlags 白名单中
+  └── additionalCommandIsDangerousCallback() 额外验证
+  │
+  ▼
+[层 5：沙箱（可选，macOS/Linux）]
+  文件：sandbox-adapter.ts
+  ├── macOS：Sandbox.app（Apple 沙箱，读写限制）
+  ├── Linux：firejail / seccomp
+  └── 沙箱内仍保留 deny 规则检查（sandbox auto-allow 场景）
+  │
+  ▼
+执行命令</pre></div><hr>
+<h2>三、模式卡片</h2>
+<h3>模式卡片 #6：多层防御安全模型</h3>
+<p><strong>问题</strong>：如何保证 LLM 生成的 bash 命令不破坏用户系统？</p>
+<p><strong>方案</strong>：五层递进式防御，每层职责单一且互相补充：</p>
+<p><strong>层 1 — 声明式规则匹配</strong>（<code>bashPermissions.ts</code>，函数 <code>matchingRulesForInput</code>）</p>
+<ul>
+<li>用户在 <code>settings.json</code> 中声明 <code>alwaysDeny</code>/<code>alwaysAsk</code>/<code>alwaysAllow</code> 规则</li>
+<li>Deny 规则优先，防止任何包装技巧绕过（<code>nohup FOO=bar timeout 5 claude</code> 也能被 <code>Bash(claude:*)</code> deny 规则拦截）</li>
+</ul>
+<p><strong>层 2 — AST 静态分析</strong>（<code>ast.ts</code>，函数 <code>parseForSecurity</code>）</p>
+<ul>
+<li>用 tree-sitter 解析 bash AST，提取每条子命令的 argv[]</li>
+<li>FAIL-CLOSED 设计：未识别节点 = 拒绝分析 = 要求用户确认</li>
+<li>超时保护（50ms）和节点数限制（50,000），防止 DoS</li>
+</ul>
+<p><strong>层 3 — 语义危险检测</strong>（<code>bashSecurity.ts</code>，函数 <code>bashCommandIsSafe_DEPRECATED</code>）</p>
+<ul>
+<li>23 类 pattern 检查，覆盖 parser differential、obfuscation、Zsh 特有攻击</li>
+<li>对已由 AST 分析的命令可跳过（<code>!astParseSucceeded</code> 条件门控）</li>
+</ul>
+<p><strong>层 4 — 路径约束</strong>（<code>pathValidation.ts</code> + <code>filesystem.ts</code>）</p>
+<ul>
+<li>路径白名单（工作目录）+ 黑名单（<code>.bashrc</code>、<code>.gitconfig</code> 等敏感文件）</li>
+<li><code>pathInWorkingPath()</code> 用相对路径计算防止 <code>../..</code> 逃逸</li>
+<li>symlink 双路径检查防止间接逃逸</li>
+</ul>
+<p><strong>层 5 — OS 沙箱</strong>（<code>sandbox-adapter.ts</code>）</p>
+<ul>
+<li>macOS Sandbox / Linux firejail，OS 级别的系统调用拦截</li>
+<li>软限制（deny 规则仍然生效）</li>
+</ul>
+<p><strong>关键洞察：为什么字符串匹配不够，必须用 AST？</strong></p>
+<p>bash 的语法极其复杂，存在大量&quot;解析差异&quot;：</p>
+<ul>
+<li>Brace 展开：<code>{--exec=&quot;evil&quot;,safe}</code> 正则看到一个词，bash 看到两个</li>
+<li>变量 word-split：<code>VAR=&quot;-rf /&quot;</code> 加上 <code>rm $VAR</code>，正则看到无害的 <code>$VAR</code>，bash 执行 <code>-rf /</code></li>
+<li>ANSI-C 字符串：<code>$&#39;\x65\x76\x69\x6c&#39;</code> 正则无法解码，bash 展开为 <code>evil</code></li>
+<li>Zsh <code>=cmd</code> 展开：<code>=curl evil.com</code> 正则看到以 <code>=</code> 开头的词，bash 执行 <code>/usr/bin/curl</code></li>
+</ul>
+<p>AST 分析通过 FAIL-CLOSED 原则解决这些问题：遇到任何语法上的不确定性，宁可要求用户确认，也不假设命令安全。</p>
+<p><strong>适用条件</strong>：</p>
+<ul>
+<li>LLM 生成代码/命令的 Agent 系统</li>
+<li>用户可能不具备判断每条命令是否安全的能力</li>
+<li>需要在安全性和可用性之间精确平衡（过度限制会降低效率）</li>
+</ul>
+<p><strong>权衡</strong>：</p>
+<ul>
+<li>AST 分析增加延迟（tree-sitter WASM 解析，有 50ms 超时）</li>
+<li>FAIL-CLOSED 导致一些复杂但安全的命令也需要用户确认（false positive）</li>
+<li>沙箱会拦截一些合法的系统调用（如某些网络操作）</li>
+<li>正则路径（deprecated）作为 fallback，存在被绕过的历史漏洞</li>
+</ul>
+<hr>
+<h3>模式卡片 #7：声明式权限规则引擎</h3>
+<p><strong>问题</strong>：如何让用户可配置地控制工具权限，而不需要改代码？</p>
+<p><strong>方案</strong>：基于分层 settings 的规则引擎，<code>ToolPermissionContext</code> 作为运行时规则容器</p>
+<p><strong>规则结构</strong>：</p>
+<div class="code-block"><pre>type PermissionRule = {
+  source: PermissionRuleSource   // 规则来源（决定优先级和持久化位置）
+  ruleBehavior: 'allow' | 'deny' | 'ask'
+  ruleValue: { toolName: string; ruleContent?: string }
+}</pre></div><p>Bash 规则 <code>ruleContent</code> 语法（由 <code>shellRuleMatching.ts</code> 解析）：</p>
+<ul>
+<li><code>git status</code> — 精确匹配</li>
+<li><code>git commit:*</code> — 前缀匹配（git commit 加任意后缀）</li>
+<li><code>npm run *</code> — 通配符模式</li>
+</ul>
+<p><strong>分层 settings 体系</strong>（优先级从高到低）：</p>
+<div class="code-block"><pre>policySettings（企业管控）
+  &gt; userSettings（~/.claude/settings.json，全局用户配置）
+  &gt; projectSettings（.claude/settings.json，项目级别）
+  &gt; localSettings（.claude/settings.local.json，本地不提交）
+  &gt; flagSettings（CLI 参数 --allow-bash）
+  &gt; session（用户在会话中点"不再询问"）</pre></div><p><strong>关键设计决策：规则优先级</strong></p>
+<div class="code-block"><pre>deny &gt; ask &gt; allow，精确匹配 &gt; 前缀/通配符</pre></div><p>原因：</p>
+<ul>
+<li>Deny 优先保证了安全底线——用户明确禁止的命令永远不执行</li>
+<li>Ask 优先于 Allow 提供了&quot;强制审查&quot;的逃生通道</li>
+<li>精确匹配优先于前缀避免了宽泛规则意外覆盖精确规则</li>
+</ul>
+<p><strong>Deny 规则的特殊处理</strong>：匹配时使用 <code>stripAllLeadingEnvVars</code>（不只剥离安全白名单中的 env var），防止 <code>FOO=bar denied_cmd</code> 绕过 <code>Bash(denied_cmd:*)</code> 的 deny 规则。Allow 规则只剥离安全 env var，防止 <code>DOCKER_HOST=evil docker ps</code> 自动匹配 <code>Bash(docker ps:*)</code> 规则。</p>
+<p><strong>规则建议机制</strong>：当命令需要用户确认时，系统自动建议合适粒度的规则：</p>
+<ul>
+<li>稳定前缀（<code>git commit:*</code>）优于精确命令（每次参数不同的命令无法精确再匹配）</li>
+<li>Heredoc 命令 → 取 heredoc 前的命令前缀作为规则</li>
+<li>多行命令 → 取第一行作为前缀规则</li>
+<li>Shell 解释器（<code>bash</code>、<code>zsh</code>、<code>sudo</code> 等）→ 不建议 <code>Bash(bash:*)</code> 这类过于宽泛的规则</li>
+</ul>
+<p><strong>适用条件</strong>：</p>
+<ul>
+<li>用户需要精细控制 AI 工具权限（既不想每次都问，也不想完全信任）</li>
+<li>不同项目需要不同权限配置</li>
+<li>企业环境需要统一策略管控</li>
+</ul>
+<p><strong>权衡</strong>：</p>
+<ul>
+<li>规则越细越安全，但用户配置成本高</li>
+<li>前缀规则复用性强，但可能意外允许危险命令（<code>Bash(git:*)</code> 允许所有 git 操作）</li>
+<li>session 临时规则使用方便，但无法持久化——重启后需重新确认</li>
+<li>deny 规则的激进 env-var 剥离可能造成意外拦截（<code>ANT_ENV=prod denied_cmd</code> 也被拦截）</li>
+</ul>
+<hr>
+<h2>四、关键文件索引</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>五、安全设计的深层 Insight</h2>
+<h3>1. FAIL-CLOSED 而非 FAIL-OPEN</h3>
+<p>整个安全系统的设计哲学是 fail-closed：当无法分析时，宁可提示用户，不默认允许。体现在：</p>
+<ul>
+<li>AST 分析遇到未知节点 → <code>too-complex</code> → ask</li>
+<li>Parser 超时/节点过多 → <code>PARSE_ABORT</code> → too-complex（防止 DoS 攻击构造的恶意输入）</li>
+<li>旧的 parse-unavailable 分支会复用 legacy 路径，但少了部分检查（<code>EVAL_LIKE_BUILTINS</code>），这被认为是安全缺陷并已修复</li>
+</ul>
+<h3>2. 分层防御的关键：各层独立，不能绕过</h3>
+<p>每层都有独立的检查目标：</p>
+<ul>
+<li>规则引擎（层 1）检查用户意图</li>
+<li>AST 分析（层 2）检查结构性欺骗</li>
+<li>正则检查（层 2b）检查字符串层面的混淆</li>
+<li>路径检查（层 3）检查文件系统越界</li>
+</ul>
+<p>它们相互补充：比如 <code>Bash(git:*)</code> allow 规则通过了层 1，但如果命令中包含 <code>--upload-pack=$(evil)</code> 会被层 2 的 <code>command_substitution</code> 检测拦截。</p>
+<h3>3. 解析差异（Parser Differential）是核心威胁模型</h3>
+<p>代码注释中反复出现的模式：</p>
+<blockquote>
+<p>工具（tree-sitter/shell-quote）解析命令的方式 ≠ bash 实际执行命令的方式</p>
+</blockquote>
+<p>这种差异可以被攻击者利用，让命令看起来安全但实际危险。防御思路是：</p>
+<ul>
+<li>对所有可能产生差异的语法构造，选择保守（要求用户确认）</li>
+<li>尽量减少依赖单一解析器，多路径交叉验证</li>
+</ul>
+<h3>4. 规则引擎的对称性设计</h3>
+<p>Allow 规则和 Deny 规则采用不同的 env-var 剥离策略，这不是 bug 而是精心设计：</p>
+<ul>
+<li>Allow 规则需要精确匹配，额外的 env var 应该让规则无法匹配（避免意外允许）</li>
+<li>Deny 规则需要广覆盖，任何包装都不应该让被禁命令溜过去</li>
+</ul>
+<p>这种非对称设计体现了&quot;allow 要谨慎，deny 要彻底&quot;的安全原则。</p>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

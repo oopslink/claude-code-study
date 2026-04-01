@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>模式卡片总览 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/patterns$ <span style="color:var(--green)">cat patterns.md</span>
+    </div>
+    <div class="content">
+      <h1>Claude Code 设计模式卡片索引</h1>
+<p>本目录收录 Claude Code 精读过程中归纳的 10 个核心设计模式，每个模式对应一个独立的卡片文件。</p>
+<hr>
+<h2>模式列表</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>模式摘要</h2>
+<h3>1. 流式响应 + 工具调用循环</h3>
+<p><strong>问题摘要</strong>：如何在流式输出中处理工具调用并维持多轮对话？</p>
+<p><strong>核心思路</strong>：AsyncGenerator 链 + <code>while(true)</code> 状态机循环。<code>content_block_stop</code> 时立即 yield AssistantMessage，工具执行结果以 UserMessage 注入下一轮 messages，循环继续直到无工具调用或达到终止条件。</p>
+<p><strong>关键文件</strong>：<code>src/query.ts</code>（L241-1729），<code>src/claude.ts</code>（L1940-2304）</p>
+<hr>
+<h3>2. Tool 接口统一抽象</h3>
+<p><strong>问题摘要</strong>：如何让文件读取、Bash 执行、网络请求、子 agent 启动、MCP 代理等异构工具被模型统一调用？</p>
+<p><strong>核心思路</strong>：单一 <code>Tool&lt;Input, Output, Progress&gt;</code> 泛型接口 + <code>buildTool()</code> 工厂函数（fail-closed 默认值）+ Zod schema（运行时校验 + JSON Schema 生成三合一）。</p>
+<p><strong>关键文件</strong>：<code>src/tools/Tool.ts</code>（L362, L783）</p>
+<hr>
+<h3>3. 进度上报与 UI 解耦</h3>
+<p><strong>问题摘要</strong>：如何将工具执行的中间进度实时推送到 UI，且工具逻辑不依赖任何 UI 框架？</p>
+<p><strong>核心思路</strong>：<code>onProgress?: ToolCallProgress&lt;P&gt;</code> 回调注入。框架在调用 <code>tool.call()</code> 时注入回调，工具通过 <code>onProgress({ data })</code> 上报，数据先存入 <code>ProgressMessage</code>，UI 组件从消息历史读取后渲染。</p>
+<p><strong>关键文件</strong>：<code>src/tools/Tool.ts</code>（L384），<code>src/tools/AgentTool/AgentTool.tsx</code></p>
+<hr>
+<h3>4. 分层 Agent 编排</h3>
+<p><strong>问题摘要</strong>：如何根据任务特征选择合适的 agent 执行模式（本地/远程/进程内）？</p>
+<p><strong>核心思路</strong>：三种 Task 类型——LocalAgentTask（即发即忘，克隆上下文隔离），RemoteAgentTask（云端执行，本地轮询），InProcessTeammateTask（持续协作，AsyncLocalStorage 隔离）。所有结果通过 <code>enqueuePendingNotification()</code> 异步注入父对话。</p>
+<p><strong>关键文件</strong>：<code>src/tasks/LocalAgentTask/</code>，<code>src/tasks/RemoteAgentTask/</code>，<code>src/tasks/InProcessTeammateTask/</code></p>
+<hr>
+<h3>5. Coordinator-Worker 模式</h3>
+<p><strong>问题摘要</strong>：如何将大任务分解给多个并行 agent 执行，避免 coordinator 自身执行具体操作带来的混乱？</p>
+<p><strong>核心思路</strong>：Coordinator 工具集严格限定为编排类工具（AgentTool、SendMessageTool 等），不能直接执行文件操作。Worker 通过 LocalAgentTask 并行执行，结果以 XML user-role 消息形式异步通知 coordinator。</p>
+<p><strong>关键文件</strong>：<code>src/coordinatorMode.ts</code>，<code>src/tools/AgentTool/</code></p>
+<hr>
+<h3>6. 多层防御安全模型</h3>
+<p><strong>问题摘要</strong>：如何保证 LLM 生成的 bash 命令不破坏用户系统？</p>
+<p><strong>核心思路</strong>：五层递进防御——声明式规则匹配（deny 优先）→ AST 静态分析（FAIL-CLOSED，遇到不确定性要求确认）→ 语义危险检测（23 类 pattern）→ 路径约束（工作目录白名单 + 敏感文件黑名单）→ OS 沙箱（macOS Sandbox / firejail）。各层独立，不能绕过。</p>
+<p><strong>关键文件</strong>：<code>src/tools/BashTool/bashPermissions.ts</code>，<code>src/utils/bash/ast.ts</code>，<code>src/utils/sandbox/sandbox-adapter.ts</code></p>
+<hr>
+<h3>7. 声明式权限规则引擎</h3>
+<p><strong>问题摘要</strong>：如何让用户可配置地控制工具权限，而不需要改代码？</p>
+<p><strong>核心思路</strong>：分层 settings 体系（enterprise policy &gt; user &gt; project &gt; local &gt; flag &gt; session），规则优先级 <code>deny &gt; ask &gt; allow</code>，精确匹配 &gt; 前缀/通配符。Deny 规则剥离所有 env var（防包装绕过），Allow 规则只剥离安全白名单（防意外宽松匹配）。</p>
+<p><strong>关键文件</strong>：<code>src/tools/BashTool/bashPermissions.ts</code>，<code>src/types/permissions.ts</code></p>
+<hr>
+<h3>8. 插件热加载与能力扩展</h3>
+<p><strong>问题摘要</strong>：如何在不修改核心代码、不重启进程的情况下，让 agent 获得新能力？</p>
+<p><strong>核心思路</strong>：Plugin（纯 Markdown + JSON 包，无可执行代码）+ Skill（<code>getPromptForCommand()</code> 行为注入）双轨扩展。Plugin 启动时并行加载（<code>Promise.allSettled</code> 错误隔离），Skill 通过 chokidar 文件监听实现热重载（300ms 防抖）。</p>
+<p><strong>关键文件</strong>：<code>src/utils/plugins/pluginLoader.ts</code>，<code>src/tools/SkillTool/SkillTool.ts</code>，<code>src/utils/skills/skillChangeDetector.ts</code></p>
+<hr>
+<h3>9. 分层内存架构</h3>
+<p><strong>问题摘要</strong>：如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？</p>
+<p><strong>核心思路</strong>：三层分离——短期（JSONL append-only，parentUuid DAG 链）、中期（compact 摘要，LLM 生成 + boundary marker 切片）、长期（memory files，每条记忆独立文件 + MEMORY.md 索引）。Git root 作为记忆目录键保证 worktree 共享。</p>
+<p><strong>关键文件</strong>：<code>src/memdir/memdir.ts</code>，<code>src/utils/sessionStorage.ts</code>，<code>src/services/extractMemories/extractMemories.ts</code></p>
+<hr>
+<h3>10. 上下文压缩触发与摘要注入</h3>
+<p><strong>问题摘要</strong>：Context window 有限，如何在长对话中不丢失重要信息？</p>
+<p><strong>核心思路</strong>：阈值触发（<code>tokenCount &gt;= contextWindow - 33K</code>）→ LLM 生成 9 章节结构化摘要（先 <code>&lt;analysis&gt;</code> 草稿再正文）→ 替换旧消息 + 写 boundary marker。LLM 摘要而非硬截断，保留语义连贯性和任务状态。Prompt cache 共享降低摘要 API 成本。</p>
+<p><strong>关键文件</strong>：<code>src/services/compact/autoCompact.ts</code>，<code>src/services/compact/compact.ts</code>，<code>src/services/compact/prompt.ts</code></p>
+<hr>
+<h2>使用建议</h2>
+<p>这些模式卡片的&quot;在自己项目中的应用思考&quot;部分留空，供个人填写。建议在阅读每个卡片后，结合自己当前或计划中的项目，回答三个问题：</p>
+<ol>
+<li><strong>这个问题在我的项目中存在吗？</strong> — 如果不存在，这个模式可能不适用</li>
+<li><strong>可以直接用吗？还是需要简化/调整？</strong> — 评估复杂度匹配度</li>
+<li><strong>可以省略的复杂度：</strong> — 识别哪些是 Claude Code 特有的需求，在自己项目中可以简化</li>
+</ol>
+<p><strong>精读来源</strong>：<code>docs/study-notes/phase-b/</code>（task-04 到 task-09）</p>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 3 · 子系统 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-a$ <span style="color:var(--green)">cat task-03-system-overview.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 3：六大子系统速览与边界图</h1>
+<h2>各子系统速览</h2>
+<h3>子系统 1：Agent 核心循环</h3>
+<p><strong>query() 函数签名</strong>（<code>src/query.ts</code> 第 219 行）：</p>
+<div class="code-block"><pre>export async function* query(
+  params: QueryParams,
+): AsyncGenerator&lt;
+  | StreamEvent
+  | RequestStartEvent
+  | Message
+  | TombstoneMessage
+  | ToolUseSummaryMessage,
+  Terminal
+&gt;</pre></div><ul>
+<li>输入：<code>QueryParams</code>（含消息历史、工具列表、系统提示等）</li>
+<li>输出：异步生成器，每次 yield 一个流事件或消息，最终 return <code>Terminal</code>（终止状态）</li>
+<li>内部委托给 <code>queryLoop()</code> 私有函数，<code>query()</code> 本身只做命令生命周期通知的包装</li>
+</ul>
+<p><strong>QueryEngine 结构</strong>（<code>src/QueryEngine.ts</code>）：</p>
+<ul>
+<li>是一个<strong>类</strong>（<code>export class QueryEngine</code>），不是函数</li>
+<li>配置类型：<code>QueryEngineConfig</code>（含 <code>cwd</code>、<code>tools</code>、<code>commands</code>、<code>mcpClients</code>、<code>agents</code>、<code>canUseTool</code>、<code>getAppState/setAppState</code>、<code>maxTurns</code>、<code>maxBudgetUsd</code> 等）</li>
+<li>主要公开方法：<ul>
+<li><code>async *submitMessage(prompt, options?)</code> — 核心方法，接受用户输入，返回 <code>AsyncGenerator&lt;SDKMessage&gt;</code></li>
+<li><code>getMessages(): readonly Message[]</code> — 读取当前消息历史</li>
+<li><code>getReadFileState(): FileStateCache</code> — 读取文件缓存状态</li>
+<li><code>getSessionId(): string</code> — 读取会话 ID</li>
+</ul>
+</li>
+<li>私有状态：<code>mutableMessages</code>、<code>abortController</code>、<code>permissionDenials</code>、<code>readFileState</code>、<code>discoveredSkillNames</code>、<code>loadedNestedMemoryPaths</code></li>
+<li><code>QueryEngine</code> 是 SDK 模式下的入口，CLI 模式下直接使用 <code>query()</code> 函数</li>
+</ul>
+<hr>
+<h3>子系统 2：工具系统</h3>
+<p><strong>getTools() 签名</strong>（<code>src/tools.ts</code> 第 271 行）：</p>
+<div class="code-block"><pre>export const getTools = (permissionContext: ToolPermissionContext): Tools =&gt; { ... }</pre></div><ul>
+<li>返回类型：<code>Tools</code>（即 <code>Tool[]</code>，定义在 <code>src/Tool.ts</code>）</li>
+<li>底层调用 <code>getAllBaseTools()</code> 获取全量工具列表，再按权限上下文过滤</li>
+</ul>
+<p><strong>工具注册方式</strong>：混合模式——静态列表 + 特性标志动态裁剪</p>
+<p><code>getAllBaseTools()</code> 中的注册方式分三层：</p>
+<ol>
+<li><strong>静态导入</strong>（始终加载）：<code>AgentTool</code>、<code>BashTool</code>、<code>FileReadTool</code>、<code>FileEditTool</code>、<code>FileWriteTool</code>、<code>GlobTool</code>、<code>GrepTool</code>、<code>SkillTool</code>、<code>WebFetchTool</code>、<code>TodoWriteTool</code>、<code>WebSearchTool</code> 等核心工具</li>
+<li><strong>环境变量条件</strong>（<code>process.env.USER_TYPE === &#39;ant&#39;</code>）：<code>REPLTool</code>、<code>SuggestBackgroundPRTool</code>、<code>ConfigTool</code>、<code>TungstenTool</code></li>
+<li><strong>特性标志条件</strong>（<code>feature(&#39;XXX&#39;)</code>）：<code>SleepTool</code>（PROACTIVE/KAIROS）、<code>CronCreateTool/CronDeleteTool/CronListTool</code>（AGENT_TRIGGERS）、<code>RemoteTriggerTool</code>、<code>MonitorTool</code>、<code>WorkflowTool</code> 等</li>
+</ol>
+<p><code>tools/shared/</code> 目录下共享工具（<code>gitOperationTracking.ts</code>、<code>spawnMultiAgent.ts</code>）供多个工具使用。</p>
+<hr>
+<h3>子系统 3：多智能体</h3>
+<p><strong>Task 具体类型</strong>（来自 <code>src/Task.ts</code> + <code>src/tasks/types.ts</code> + 目录结构）：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>还有一个特殊文件 <code>LocalMainSessionTask.ts</code>，对应主会话自身（不在 TaskType 枚举中）。</p>
+<p><strong>TaskStatus</strong>：<code>pending | running | completed | failed | killed</code></p>
+<p><code>tasks/</code> 目录完整结构：</p>
+<div class="code-block"><pre>src/tasks/
+  DreamTask/
+  InProcessTeammateTask/
+  LocalAgentTask/
+  LocalMainSessionTask.ts
+  LocalShellTask/
+  RemoteAgentTask/
+  pillLabel.ts
+  stopTask.ts
+  types.ts</pre></div><p><code>src/Task.ts</code> 定义 <code>Task</code> 接口（只含 <code>name</code>、<code>type</code>、<code>kill()</code> 方法），是多态分派的最小接口。</p>
+<hr>
+<h3>子系统 4：插件/技能系统</h3>
+<p><strong>Plugin 目录</strong>：<code>src/services/plugins/</code></p>
+<div class="code-block"><pre>src/services/plugins/
+  pluginCliCommands.ts
+  PluginInstallationManager.ts
+  pluginOperations.ts</pre></div><p>加载入口：<code>src/utils/plugins/pluginLoader.ts</code>（被 <code>QueryEngine.ts</code> 的 <code>loadAllPluginsCacheOnly()</code> 调用）</p>
+<p><strong>Skill 目录</strong>：<code>src/skills/</code></p>
+<div class="code-block"><pre>src/skills/
+  bundled/         （内置 skills 资源）
+  bundledSkills.ts （内置 skills 注册）
+  loadSkillsDir.ts （从目录加载 skills）
+  mcpSkillBuilders.ts（MCP 协议的 skill 构建器）</pre></div><p><strong>SkillTool 目录</strong>：<code>src/tools/SkillTool/</code></p>
+<div class="code-block"><pre>src/tools/SkillTool/
+  constants.ts
+  prompt.ts
+  SkillTool.ts   （工具实现主文件）
+  UI.tsx</pre></div><p><code>SkillTool.ts</code> 前 30 行显示它从 <code>src/commands.js</code>、<code>src/Tool.js</code> 等导入，是 Skill 子系统与工具系统的桥接点。Plugin 负责外部扩展的安装管理，Skill 负责具体能力的加载与执行，SkillTool 是 AI 模型调用 Skill 的工具接口。</p>
+<hr>
+<h3>子系统 5：上下文与内存管理</h3>
+<p><strong>memdir.ts 管理的内存类型</strong>：</p>
+<p><code>src/memdir/memdir.ts</code> 管理的是<strong>持久化文件内存</strong>（磁盘上的 <code>MEMORY.md</code>）：</p>
+<ul>
+<li>入口文件名：<code>MEMORY.md</code>（常量 <code>ENTRYPOINT_NAME</code>）</li>
+<li>最大行数限制：200 行（<code>MAX_ENTRYPOINT_LINES</code>）</li>
+<li>最大字节限制：25,000 字节（<code>MAX_ENTRYPOINT_BYTES</code>）</li>
+<li>提供 <code>loadMemoryPrompt()</code>（被 <code>QueryEngine.ts</code> 调用）将记忆内容注入系统提示</li>
+<li>支持自动记忆路径（<code>isAutoMemoryEnabled()</code>）和团队记忆（feature <code>TEAMMEM</code>）</li>
+</ul>
+<p><strong>与 SessionStorage 的对比</strong>：</p>
+<ul>
+<li><code>memdir</code>：跨会话持久化，写入磁盘文件，人类可读，用于长期知识积累</li>
+<li><code>sessionStorage</code>（<code>src/utils/sessionStorage.ts</code>）：单会话内持久化，存储对话记录（transcript），会话结束后可供回溯，但不是跨会话记忆</li>
+</ul>
+<p><strong>SessionMemory 目录</strong>（<code>src/services/SessionMemory/</code>）：</p>
+<div class="code-block"><pre>src/services/SessionMemory/
+  prompts.ts
+  sessionMemory.ts
+  sessionMemoryUtils.ts</pre></div><p>SessionMemory 负责会话内的摘要/压缩记忆（autoCompact 调用 <code>setLastSummarizedMessageId</code>），是 compact 操作的记录层。</p>
+<p><strong>autoCompact 主函数</strong>（<code>src/services/compact/autoCompact.ts</code>）：</p>
+<p>关键函数：</p>
+<div class="code-block"><pre>export function calculateTokenWarningState(
+  tokenUsage: number,
+  model: string,
+): {
+  percentLeft: number
+  isAboveWarningThreshold: boolean
+  isAboveErrorThreshold: boolean
+  isAboveAutoCompactThreshold: boolean
+  isAtBlockingLimit: boolean
+}
+
+export function isAutoCompactEnabled(): boolean
+
+export function getAutoCompactThreshold(model: string): number</pre></div><p><code>calculateTokenWarningState</code> 被 <code>src/query.ts</code> 导入，在每次 query 循环中检查 token 使用量是否触发自动压缩阈值。触发条件：<code>tokenUsage &gt;= autoCompactThreshold</code>（默认为 contextWindow - 20,000 - 13,000 的保留 tokens）。</p>
+<hr>
+<h3>子系统 6：安全与沙箱</h3>
+<p><strong>BashTool 目录分层</strong>（<code>src/tools/BashTool/</code>）：</p>
+<div class="code-block"><pre>src/tools/BashTool/
+  BashTool.tsx              [执行层] 工具主入口，协调验证和执行
+  bashCommandHelpers.ts     [执行层] 命令辅助函数
+  utils.ts                  [执行层] 通用工具函数
+  commandSemantics.ts       [验证层] 命令语义分析
+  commentLabel.ts           [验证层] 命令注释标签处理
+  destructiveCommandWarning.ts [安全层] 破坏性命令警告
+  modeValidation.ts         [验证层] 模式验证（只读/读写等）
+  pathValidation.ts         [安全层] 路径安全验证
+  readOnlyValidation.ts     [验证层] 只读模式验证
+  sedEditParser.ts          [验证层] sed 命令解析
+  sedValidation.ts          [安全层] sed 命令安全验证
+  bashPermissions.ts        [安全层] 权限检查入口
+  bashSecurity.ts           [安全层] 安全策略核心
+  shouldUseSandbox.ts       [安全层] 沙箱决策
+  BashToolResultMessage.tsx [UI 层] 结果展示
+  UI.tsx                    [UI 层] 工具 UI 组件
+  prompt.ts                 [配置层] 提示词定义
+  toolName.ts               [配置层] 工具名称常量</pre></div><p><strong>utils/bash/ 目录</strong>（低层 bash 解析与分析）：</p>
+<div class="code-block"><pre>src/utils/bash/
+  ast.ts              bash AST 节点定义
+  bashParser.ts       bash 解析器主文件
+  bashPipeCommand.ts  管道命令解析
+  commands.ts         命令注册表
+  heredoc.ts          heredoc 解析
+  ParsedCommand.ts    解析结果类型
+  parser.ts           底层 parser
+  prefix.ts           命令前缀处理
+  registry.ts         命令语义注册
+  shellCompletion.ts  shell 补全
+  shellPrefix.ts      shell 前缀检测
+  shellQuote.ts       shell 引号处理
+  shellQuoting.ts     引号策略
+  ShellSnapshot.ts    shell 状态快照
+  specs/              命令规范定义
+  treeSitterAnalysis.ts tree-sitter AST 分析</pre></div><p><strong>utils/permissions/ 目录</strong>（权限规则引擎）：</p>
+<div class="code-block"><pre>src/utils/permissions/
+  autoModeState.ts       自动模式状态管理
+  bashClassifier.ts      bash 命令分类器
+  bypassPermissionsKillswitch.ts  权限绕过开关
+  classifierDecision.ts  分类决策
+  classifierShared.ts    分类共享逻辑
+  dangerousPatterns.ts   危险模式匹配
+  denialTracking.ts      拒绝记录追踪
+  filesystem.ts          文件系统权限
+  getNextPermissionMode.ts  模式切换逻辑
+  pathValidation.ts      路径验证
+  permissionExplainer.ts 权限解释（用户提示）
+  PermissionMode.ts      权限模式枚举
+  PermissionPromptToolResultSchema.ts  权限提示协议
+  PermissionResult.ts    权限结果类型
+  PermissionRule.ts      规则类型定义
+  permissionRuleParser.ts  规则解析
+  permissions.ts         权限检查主入口
+  permissionSetup.ts     权限初始化
+  permissionsLoader.ts   权限配置加载
+  PermissionUpdate.ts    权限更新事件
+  PermissionUpdateSchema.ts  更新协议
+  shadowedRuleDetection.ts  规则遮蔽检测
+  shellRuleMatching.ts   shell 规则匹配
+  yoloClassifier.ts      YOLO 模式分类器</pre></div><hr>
+<h2>系统边界图</h2>
+<div class="code-block"><pre>[子系统 1：Agent 核心循环]
+  ├── 直接依赖 → [子系统 2：工具系统]（执行 tool_use 块）
+  ├── 直接依赖 → [子系统 5：上下文/内存管理]（注入 memdir、触发 autoCompact）
+  ├── 直接依赖 → [子系统 6：安全/沙箱]（通过 canUseTool 检查权限）
+  ├── 直接依赖 → [子系统 3：多智能体]（AgentTool 产生子任务）
+  ├── 提供给 → CLI 入口（query() 函数）/ SDK 入口（QueryEngine.submitMessage()）
+  └── 数据流：UserMessage → [LLM API] → StreamEvent/ToolUse → Message → Terminal
+
+[子系统 2：工具系统]
+  ├── 直接依赖 → [子系统 6：安全/沙箱]（BashTool 调用 bashPermissions/bashSecurity）
+  ├── 直接依赖 → [子系统 4：插件/技能系统]（SkillTool 调用 skill 加载器）
+  ├── 直接依赖 → [子系统 3：多智能体]（AgentTool 生成 LocalAgentTask）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（工具执行结果作为 ToolResult 返回）
+  └── 数据流：ToolUseBlock → [工具实现] → ToolResultBlockParam
+
+[子系统 3：多智能体]
+  ├── 直接依赖 → [子系统 1：Agent 核心循环]（LocalAgentTask 内部运行 query()）
+  ├── 直接依赖 → [子系统 2：工具系统]（TaskStopTool、TaskOutputTool 等）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（AgentTool 的调用结果）
+  └── 数据流：AgentTool 调用 → TaskState(pending) → TaskState(running) → TaskState(completed/failed)
+
+[子系统 4：插件/技能系统]
+  ├── 直接依赖 → [子系统 2：工具系统]（SkillTool 是技能的工具接口）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（QueryEngine 预加载插件缓存）
+  └── 数据流：Plugin 安装/配置 → Skill 目录加载 → SkillTool 暴露给 LLM
+
+[子系统 5：上下文与内存管理]
+  ├── 直接依赖 → [子系统 1：Agent 核心循环]（memdir 注入系统提示，compact 裁剪消息历史）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（内存提示内容、压缩后消息列表）
+  └── 数据流：MEMORY.md → loadMemoryPrompt() → SystemPrompt 注入
+              消息历史 token 超限 → autoCompact() → 压缩后历史 + SessionMemory 记录
+
+[子系统 6：安全与沙箱]
+  ├── 直接依赖 → 无（叶子节点，不依赖其他子系统）
+  ├── 提供给 → [子系统 2：工具系统]（BashTool 的安全检查）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（canUseTool 权限拦截）
+  └── 数据流：ToolUse 请求 → PermissionRule 匹配 → Allow/Deny/AskUser</pre></div><hr>
+<h2>核心节点分析</h2>
+<p><strong>核心枢纽（被多个系统依赖）</strong>：</p>
+<ol>
+<li><p><strong>子系统 1：Agent 核心循环</strong> — 最核心的枢纽。所有其他子系统最终都服务于它：工具系统提供执行能力，内存管理提供上下文，安全沙箱提供护栏，多智能体在其内部嵌套运行，插件/技能通过 SkillTool 接入。<code>query()</code> 是整个系统的生命线。</p>
+</li>
+<li><p><strong>子系统 2：工具系统</strong> — 第二核心枢纽。作为 Agent 能力的载体，连接安全层（BashTool）、技能层（SkillTool）和多智能体层（AgentTool）。<code>getTools()</code> 是工具注册的单一真相来源。</p>
+</li>
+</ol>
+<p><strong>中间节点（双向依赖）</strong>：</p>
+<ol start="3">
+<li><p><strong>子系统 3：多智能体</strong> — 既依赖核心循环（子任务内部运行 query()），也被核心循环依赖（AgentTool 触发子任务）。形成递归结构。</p>
+</li>
+<li><p><strong>子系统 5：上下文与内存管理</strong> — 为核心循环提供服务，autoCompact 的触发点在 query.ts 内部，形成单向依赖。</p>
+</li>
+</ol>
+<p><strong>叶子节点（只提供服务，不依赖其他子系统）</strong>：</p>
+<ol start="5">
+<li><p><strong>子系统 6：安全与沙箱</strong> — 纯粹的提供方。<code>utils/permissions/</code> 是独立的规则引擎，<code>utils/bash/</code> 是独立的解析层，不依赖任何业务子系统。这种设计让安全层可以独立测试和演进。</p>
+</li>
+<li><p><strong>子系统 4：插件/技能系统</strong> — 接近叶子节点，主要是加载时依赖（Plugin 安装 → Skill 目录 → SkillTool），运行时被工具系统调用。</p>
+</li>
+</ol>
+<hr>
+<h2>关键发现</h2>
+<ol>
+<li><p><strong><code>query()</code> 是异步生成器，而非 Promise</strong> — 这一设计使 UI 层能够实时流式渲染每个 token 和事件，而不是等待完整响应。<code>QueryEngine.submitMessage()</code> 也是异步生成器，SDK 模式下的流式输出依赖同一机制。</p>
+</li>
+<li><p><strong>工具注册是&quot;静态列表 + 特性标志裁剪&quot;的混合模式</strong> — <code>getAllBaseTools()</code> 在模块加载时确定工具集（通过 <code>feature(&#39;XXX&#39;)</code> 和 <code>process.env</code> 判断），<code>getTools()</code> 在运行时按权限上下文过滤。没有运行时动态注册机制，扩展需要通过特性标志或 MCP 协议。</p>
+</li>
+<li><p><strong>多智能体形成递归结构</strong> — <code>LocalAgentTask</code> 内部会启动一个新的 <code>query()</code> 循环，7 种 TaskType 对应 7 种不同的并发执行模型（本地 bash、本地 agent、远程 agent、进程内队友、工作流、MCP 监控、dream）。</p>
+</li>
+<li><p><strong>安全层是完全解耦的独立子系统</strong> — <code>utils/permissions/</code> 有自己的规则解析器、分类器、路径验证等，<code>utils/bash/</code> 有完整的 bash AST 解析（基于 tree-sitter）。这两个模块不引用任何业务逻辑，是整个系统中内聚度最高的部分。</p>
+</li>
+<li><p><strong>memdir（MEMORY.md）和 SessionMemory 服务于不同时间尺度</strong> — memdir 是跨会话的长期记忆（磁盘文件，人工维护），SessionMemory 是单会话内的压缩摘要（由 autoCompact 自动管理），两者共同构成分层记忆体系。autoCompact 的触发阈值设计（保留 33,000 tokens 的缓冲区）体现了对上下文窗口利用率的精细控制。</p>
+</li>
+</ol>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 10 · 横切关注点 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-c$ <span style="color:var(--green)">cat task-10-cross-cutting.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 10：横切关注点分析</h1>
+<blockquote>
+<p>分析日期：2026-03-31
+覆盖源文件：<code>services/api/errors.ts</code>（全文）、<code>hooks/useCanUseTool.tsx</code>（全文）
+参考笔记：phase-b task-04 至 task-09</p>
+</blockquote>
+<hr>
+<h2>一、错误处理模式</h2>
+<h3>错误分类</h3>
+<p><code>errors.ts</code> 通过 <code>createAssistantAPIErrorMessage({ error: &lt;type&gt; })</code> 中的 <code>error</code> 字段进行分类：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>注意</strong>：<code>error</code> 字段仅用于内部分类和分析（<code>classifyAPIError()</code> 对应 Datadog tag）。<code>content</code> 字段才是最终展示给用户的人类可读文本，且会根据 <code>isNonInteractiveSession()</code> 调整措辞（SDK 模式省略 <code>/esc esc</code> 等 TUI 操作提示）。</p>
+<h3>工具错误格式化</h3>
+<p><strong>给模型的格式</strong>（<code>toolExecution.ts</code> L1030-1036）：</p>
+<div class="code-block"><pre>tool_result block:
+{
+  type: 'tool_result',
+  tool_use_id: '&lt;toolUseID&gt;',
+  content: '&lt;错误文本，纯字符串&gt;',
+  is_error: true
+}</pre></div><p>工具执行被权限拒绝时，<code>content</code> 是拒绝原因文本（如 <code>&quot;Execution stopped by PreToolUse hook: ...&quot;</code>）。工具执行抛出异常时，模型看到的是工具自身的异常信息。<strong>不使用 <code>&lt;tool_error&gt;</code> XML 标签</strong>，使用的是 API 协议原生的 <code>is_error: true</code> 字段标记工具结果块。</p>
+<p><strong>给用户的格式</strong>（UI 层）：</p>
+<ul>
+<li><code>UserToolErrorMessage</code> 组件（<code>components/messages/UserToolResultMessage/UserToolErrorMessage.tsx</code>）渲染工具错误</li>
+<li>展示内容包含工具名、可选的进度消息、错误内容</li>
+<li>用 <code>is_error === true</code> 分支进入错误渲染路径（<code>UserToolResultMessage.tsx L74</code>）</li>
+</ul>
+<p><strong>核心差异</strong>：给模型的是纯文本 <code>content</code> 字段 + <code>is_error: true</code> 布尔标志（结构化），给用户的是 React 组件渲染（视觉化）。两者使用同一条 <code>tool_result</code> 消息对象，但消费方不同。</p>
+<h3>HTTP 状态码处理策略</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>重试决策层</strong>：<code>withRetry.ts</code> 负责底层重试（检查 <code>signal.aborted</code>，指数退避），<code>errors.ts</code> 负责将不可重试错误转换为 <code>AssistantMessage</code> 终止当前对话轮次，两层职责分离。</p>
+<hr>
+<h2>二、权限模型一致性</h2>
+<h3>检查时机</h3>
+<p>权限检查发生在<strong>工具调用前</strong>（pre-call），不在调用中。</p>
+<p>流程：</p>
+<div class="code-block"><pre>模型生成 tool_use block
+  ↓
+toolExecution.ts: runToolUse()
+  ↓
+  1. tool.validateInput()（输入合法性检查，在权限前）
+  2. tool.checkPermissions()（工具自身的权限前置检查）
+  3. canUseTool()（通用权限系统，含 hasPermissionsToUseTool + 用户确认 UI）
+  ↓ allow → tool.call()（实际执行）
+  ↓ deny  → 生成 is_error=true 的 tool_result，模型看到拒绝原因</pre></div><p><strong>含义</strong>：</p>
+<ol>
+<li>工具不会在执行到一半时被打断（原子性保证）</li>
+<li>模型通过 <code>is_error</code> tool_result 收到拒绝信号，可以决定是否重试或采用备选方案</li>
+<li>用户交互（权限确认 UI）发生在执行前，避免「已经发生破坏性操作后才问用户」的问题</li>
+<li><code>validateInput()</code> 在权限检查前运行，允许工具在「不合规输入」和「权限不足」两个维度分别给出不同错误</li>
+</ol>
+<h3>「记住此选择」的存储机制</h3>
+<p>存储 key 格式：<code>ToolName(ruleContent)</code> ，由 <code>permissionRuleValueToString()</code> 生成（<code>utils/permissions/permissionRuleParser.ts L144-152</code>）：</p>
+<div class="code-block"><pre>// 示例
+permissionRuleValueToString({ toolName: 'Bash' })
+  // =&gt; 'Bash'（整个工具允许，无具体命令限制）
+
+permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'npm install' })
+  // =&gt; 'Bash(npm install)'（仅允许此具体命令）
+
+permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1)"' })
+  // =&gt; 'Bash(python -c "print\\(1\\)")'（括号被转义）</pre></div><p><strong>存储位置分层</strong>：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>key 的精度</strong>：<code>ruleContent</code> 是命令前缀匹配（而非完整命令哈希），设计为「允许整个命令族」而非「允许某次精确执行」。这是安全与易用性的权衡——过于精确会让用户频繁确认，过于宽松则存在权限蔓延风险。</p>
+<hr>
+<h2>三、三对核心抽象的精确边界</h2>
+<h3>Tool vs Task</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>精确边界</strong>：<code>AgentTool</code> 是一个 Tool（被模型调用），它启动后会创建一个 <code>Task</code>（框架管理的长期任务）。工具调用是模型层的「函数调用协议」，任务是框架层的「并发执行单元」。</p>
+<h3>Plugin vs Skill</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h3>Memory vs Context</h3>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>四、系统级设计模式</h2>
+<h3>AsyncGenerator 的使用</h3>
+<p><strong>关键使用位置</strong>：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>为什么偏好 AsyncGenerator 而非 Promise</strong>：</p>
+<ol>
+<li><p><strong>流式渲染需求</strong>：UI 需要在 API 响应完成前就开始渲染文字（token 级别的流式输出）。Promise 只能在完成后 resolve 一个值，无法支持增量渲染。</p>
+</li>
+<li><p><strong>自然的背压控制</strong>：AsyncGenerator 的 <code>yield</code> 点天然形成背压——消费方不调用 <code>next()</code>，产出方不继续执行。这避免了事件队列溢出问题，比 EventEmitter/回调更安全。</p>
+</li>
+<li><p><strong>组合性</strong>：<code>yield*</code> 可以直接委托给另一个 AsyncGenerator（如 <code>query()</code> 内部 <code>yield* queryLoop()</code>），形成无摩擦的流式 pipeline。与 <code>for await...of</code> 配合，消费方代码与同步代码无异。</p>
+</li>
+<li><p><strong>终止值传递</strong>：AsyncGenerator 的 <code>return</code> 语句可以携带最终值（<code>Terminal</code> 类型），而 <code>yield</code> 的每次产出是中间值。这允许 <code>query()</code> 同时流式产出消息和在最后返回退出原因。</p>
+</li>
+<li><p><strong>工具循环的自然表达</strong>：agent loop 本质是「获取 N 条消息 → 执行工具 → 继续」的迭代，AsyncGenerator 的 <code>while(true)</code> + <code>yield</code> 比 Promise.then 链更直观，也避免了递归调用的栈溢出风险。</p>
+</li>
+</ol>
+<h3>回调注入模式</h3>
+<p><strong>三个核心回调</strong>及出现位置：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>统一解决的架构问题</strong>：</p>
+<p>这三个回调共同实现了<strong>依赖倒置</strong>原则——具体工具实现（低层模块）不依赖 UI 框架（高层模块），而是通过回调接口依赖。具体体现：</p>
+<ol>
+<li><strong>可测试性</strong>：测试中注入 mock 回调，无需启动 React 渲染树或真实 API</li>
+<li><strong>子 agent 隔离</strong>：<code>createSubagentContext()</code> 通过替换 <code>setAppState</code>（改为 no-op）、<code>canUseTool</code>（强制跳过确认）实现子 agent 在后台静默运行</li>
+<li><strong>多运行模式适配</strong>：同一套工具代码，在 TUI 模式注入 Ink 渲染回调，在 SDK 模式注入无 UI 回调，在测试模式注入 mock 回调</li>
+</ol>
+<p>额外的回调注入点：<code>getAppState</code>（读取当前应用状态）、<code>setToolJSX</code>（向 UI 注入 React 节点）、<code>addNotification</code>（追加通知消息），这些构成了工具与框架通信的完整回调接口。</p>
+<hr>
+<h2>五、关键设计洞察</h2>
+<p><strong>洞察 1：错误不跨层传播，而是在边界处转换</strong></p>
+<p>从 <code>errors.ts</code> 可以观察到一个贯穿全系统的设计原则：底层错误（<code>APIError</code>、<code>ImageSizeError</code>、<code>APIConnectionTimeoutError</code>）在 API 层被捕获后，立即转换为 <code>AssistantMessage</code>（内部系统消息），而不是向上抛出异常。这意味着错误作为「消息」进入对话历史，与普通 API 响应走同一条路径。错误处理不打断控制流，而是作为对话的一部分被处理——agent loop 在收到 <code>isApiErrorMessage === true</code> 的消息后可以决定是否重试、压缩上下文或退出。</p>
+<p><strong>洞察 2：AsyncGenerator 是整个系统的「主干神经」</strong></p>
+<p>整个 Claude Code 的核心数据流是一条 AsyncGenerator 链（<code>SSE stream → queryModel → query → queryLoop → runToolUse → UI/SDK</code>）。这不是偶然的设计选择，而是流式 AI 响应的本质决定的——当输出是无限流时，Promise 是错误的抽象。AsyncGenerator 使得「实时渲染 + 工具执行 + 多轮循环」可以用线性的命令式代码表达，而不需要复杂的状态机或 Observable 订阅图。</p>
+<p><strong>洞察 3：权限系统是「调用前守门员」，而非「调用中监控者」</strong></p>
+<p><code>useCanUseTool.tsx</code> 展示的权限模型将所有安全决策前移到工具调用前。这个设计的深层含义是：系统认为工具执行本身是不可回滚的副作用，因此决不应该在执行中途中断。<code>is_error: true</code> 的 tool_result 让模型知道权限被拒，但工具从未开始运行，因此没有需要回滚的状态。<code>allowsAllowRules</code> 的分层存储（session/project/user/policy）则允许「记住选择」在不同生命周期内有效，精度达到命令前缀级别（<code>Bash(npm install)</code>），而非工具名级别（<code>Bash</code>）或命令哈希级别。</p>
+<p><strong>洞察 4：子 agent 隔离通过「克隆 + no-op 替换」而非「沙箱」实现</strong></p>
+<p><code>createSubagentContext()</code> 的设计揭示了 Claude Code 的多 agent 隔离哲学：不使用 OS 级沙箱（进程隔离），而是在同一 JS 运行时内通过精心设计的对象克隆和回调替换实现内存隔离。<code>setAppState</code> 改为 no-op（后台子 agent 不更新 UI），<code>abortController</code> 新建子控制器（子 abort 不影响父），<code>readFileState</code> 克隆（子 agent 文件缓存不污染父）。这是一种「信任但隔离」的设计——子 agent 代码与父 agent 完全相同，但通过依赖注入的回调决定其行为边界。</p>
+<p><strong>洞察 5：Memory 和 Context 服务于不同的时间维度，注入点也不同</strong></p>
+<p>系统实际上有三层「让模型知道事情」的机制，按时间维度分：长期（Memory，跨会话，注入 system prompt）、中期（compact 摘要，注入当前轮 messages 的开头 user 消息）、短期（session messages，注入 messages 数组的完整历史）。三者对应不同的存储后端和注入 API 字段（system 字段 vs messages 数组头部 vs messages 数组），各司其职。特别有意思的是 compact 摘要以 <code>user</code> role 消息（而非 system）注入——这是因为 Anthropic API 要求 messages 数组必须以 user 消息开始，compact boundary 后的摘要必须满足这个格式约束。这个实现细节暴露了 API 协议约束如何反向影响架构设计。</p>
+
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>

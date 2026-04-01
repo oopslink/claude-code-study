@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Task 8 · 插件技能 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+</style>
+</head>
+<body>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span>[STUDY NOTES v1.0]</span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr></tbody>
+    </table>
+  
+    </div>
+    <div class="sidebar-footer">22 files found.</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/phase-b$ <span style="color:var(--green)">cat task-08-plugins-skills.md</span>
+    </div>
+    <div class="content">
+      <h1>Task 08：插件与技能系统深度精读</h1>
+<blockquote>
+<p>精读日期：2026-03-31
+精读模型：Claude Sonnet 4.6
+代码库：<code>/Users/oopslink/works/codes/oos/claude-code/src/</code></p>
+</blockquote>
+<hr>
+<h2>一、Plugin vs Skill 本质区别（一句话定义）</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>核心区别</strong>：Plugin 是安装时注册的<strong>结构化包</strong>（声明式），Skill 是运行时触发的<strong>行为注入</strong>（命令式）。Plugin 可以携带 Skill（commands/ 目录下的 Markdown 即为 Skill 内容），但 Skill 不依赖 Plugin 机制也可以独立注册（bundled skills 用 TypeScript 代码直接注册）。</p>
+<hr>
+<h2>二、全面回答 12 个问题</h2>
+<h3>Q1. Plugin 和 Skill 各自是什么？</h3>
+<p><strong>Plugin</strong>：一个从 marketplace / git / npm / 本地目录安装的目录包，包含可选的 plugin.json 清单和若干子目录（commands/、agents/、hooks/、skills/、output-styles/）。Plugin 不能执行任意代码，只能注册 Markdown 命令、Agent 定义文件、Hook 配置 JSON 和 MCP bundle 文件。</p>
+<p><strong>Skill</strong>：一个可被模型通过 <code>SkillTool</code>（<code>tool_use</code> 类型）调用的命名行为单元。每个 Skill 有 <code>name</code>、<code>description</code>、可选的 <code>allowedTools</code>、可选的 <code>model</code> 以及核心的 <code>getPromptForCommand(args)</code> 函数。调用后函数返回 Markdown 文本块，这些文本块以 <strong>user 消息</strong>的形式注入到对话流。</p>
+<h3>Q2. Plugin 可以注册哪些类型的扩展？</h3>
+<p>从 <code>createPluginFromPath</code>（pluginLoader.ts:1348）及相关 schema 可以确认：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h3>Q3. Skill 的内容格式是什么？执行时发生了什么？</h3>
+<p><strong>内容格式</strong>：Skill 内容格式灵活，但核心载体是 <strong>Markdown 文本</strong>（<code>ContentBlockParam[]</code>，实际为 <code>{ type: &#39;text&#39;, text: string }[]</code>）。</p>
+<ul>
+<li><strong>Bundled skills</strong>（<code>src/skills/bundled/</code>）：TypeScript 函数，<code>getPromptForCommand(args)</code> 动态生成 Markdown 字符串。例如 <code>debug.ts</code> 会读取调试日志尾部内容后拼接成 Markdown 指令返回。</li>
+<li><strong>Disk-based skills</strong>（用户 <code>.claude/skills/</code> 或 plugin skills/）：<code>SKILL.md</code> 文件，支持 YAML frontmatter（<code>allowedTools</code>、<code>model</code>、<code>description</code> 等）+ Markdown 正文，正文中 <code>$ARGUMENTS</code> 占位符被实际参数替换。</li>
+<li><strong>MCP skills</strong>：通过 MCP 协议从外部服务器加载。</li>
+</ul>
+<p><strong>执行时发生了什么</strong>（inline 模式，最常见）：</p>
+<div class="code-block"><pre>SkillTool.call()
+  └→ processPromptSlashCommand(commandName, args, commands, context)
+       └→ command.getPromptForCommand(args)  // 获取 ContentBlockParam[]
+  └→ tagMessagesWithToolUseID(newMessages, toolUseID)
+  └→ return { data, newMessages, contextModifier }
+       // newMessages 是 UserMessage[]，包含 Skill 内容
+       // contextModifier 更新 allowedTools / model / effort</pre></div><p>Skill 内容被封装为 <strong>user 消息</strong>（<code>UserMessage</code>），通过 <code>newMessages</code> 字段返回到主循环，主循环将这些消息追加到对话历史，然后再次调用 API，这样 Claude 就&quot;看到&quot;了 Skill 的指令文本并据此行动。<strong>注入方式是 user 消息，而非 system prompt，也非 tool result。</strong></p>
+<p>对于 <strong>fork 模式</strong>（command.context === &#39;fork&#39;）：Skill 内容被包装为初始 user 消息，传给一个独立的子 Agent（<code>runAgent()</code>），子 Agent 运行完毕后将结果作为 tool result 返回给父 Agent。</p>
+<hr>
+<h3>Q4. 插件从哪些位置加载？</h3>
+<p>来源优先级（从 pluginLoader.ts 顶部注释）：</p>
+<ol>
+<li><p><strong>Marketplace-based plugins</strong>：配置格式 <code>plugin@marketplace</code>，存于 <code>settings.json</code> 的 <code>enabledPlugins</code> 字段。Marketplace 可以来源于：</p>
+<ul>
+<li><code>github</code>：<code>{ source: &#39;github&#39;, repo: &#39;owner/repo&#39;, ref?, sha? }</code></li>
+<li><code>git</code>（任意 URL）：<code>{ source: &#39;git&#39;, url: &#39;...&#39;, ref?, sha? }</code></li>
+<li><code>git-subdir</code>：只克隆仓库某个子目录（稀疏克隆）</li>
+<li><code>npm</code>：<code>{ source: &#39;npm&#39;, package: &#39;pkg-name&#39;, version?, registry? }</code></li>
+<li><code>url</code>：HTTP/HTTPS/SSH git URL</li>
+<li><code>local</code>：本地文件路径字符串（直接 copy）</li>
+</ul>
+</li>
+<li><p><strong>Session-only plugins</strong>（<code>--plugin-dir</code> CLI 参数或 SDK <code>plugins</code> 选项）：仅在本次会话生效，不写入设置。</p>
+</li>
+<li><p><strong>内置 Builtin plugins</strong>（<code>src/plugins/bundled/</code>）：目前脚手架已就绪但无已注册插件（<code>initBuiltinPlugins()</code> 函数体为空，等待迁移）。</p>
+</li>
+</ol>
+<p><strong>缓存位置</strong>：<code>~/.claude/plugins/cache/{marketplace}/{plugin}/{version}/</code>（版本化缓存），旧版为 <code>~/.claude/plugins/cache/{plugin-name}/</code>（遗留路径）。还支持 ZIP 缓存（<code>{...}.zip</code>）和 Seed 缓存（预置镜像，供 CCR 环境使用）。</p>
+<hr>
+<h3>Q5. 插件加载的完整流程</h3>
+<div class="code-block"><pre>loadAllPluginsCacheOnly() / loadAllPlugins()
+  │
+  ├─ 读取 settings.enabledPlugins（合并 --add-dir 插件）
+  ├─ 过滤 plugin@marketplace 格式
+  ├─ 加载 known_marketplaces.json（Safe 变体：损坏时返回 {}）
+  ├─ 企业策略检查（allowlist / blocklist）──失败 → push error，跳过此插件
+  ├─ 并行预加载各 marketplace 的 catalog（marketplace.json）
+  │
+  ├─ 对每个 plugin 并行执行：
+  │   ├─ 在 catalog 中查找 entry
+  │   ├─ [全量模式] 检查版本化缓存 → ZIP 缓存 → Seed 缓存 → 执行网络下载
+  │   │   ├─ npm: npm install → copy
+  │   │   ├─ github: git clone → checkout sha
+  │   │   ├─ git: git clone → checkout sha
+  │   │   ├─ git-subdir: sparse-checkout → rename 子目录
+  │   │   └─ local: copyDir
+  │   ├─ [缓存模式] 读 installPath，不做网络请求
+  │   │
+  │   └─ finishLoadingPluginFromPath()
+  │       ├─ 读 .claude-plugin/plugin.json（或旧版 plugin.json）
+  │       ├─ Zod 验证 PluginManifestSchema
+  │       ├─ createPluginFromPath()
+  │       │   ├─ 扫描 commands/、agents/、skills/、output-styles/ 是否存在
+  │       │   ├─ 验证 manifest 指定的额外路径（并行 pathExists）
+  │       │   ├─ 加载 hooks/hooks.json → mergeHooksSettings
+  │       │   └─ 加载 settings.json（白名单过滤）
+  │       └─ 返回 LoadedPlugin
+  │
+  └─ 汇总 { enabled, disabled, errors }（通过 memoize 缓存结果）</pre></div><hr>
+<h3>Q6. 插件加载失败如何处理？</h3>
+<p><strong>隔离失败，不影响主系统</strong>。核心策略：</p>
+<ol>
+<li><strong>错误收集而非抛出</strong>：<code>createPluginFromPath</code> 维护 <code>errors: PluginError[]</code> 数组，将路径缺失、hook 加载失败等问题 push 进去并继续。</li>
+<li><strong>Promise.allSettled</strong>：<code>loadPluginsFromMarketplaces</code> 用 <code>allSettled</code> 并行加载所有插件，单个插件失败不中断其他插件。</li>
+<li><strong>失败模式分类</strong>：<code>PluginError.type</code> 包括 <code>path-not-found</code>、<code>hook-load-failed</code>、<code>plugin-not-found</code>、<code>marketplace-blocked-by-policy</code>、<code>plugin-cache-miss</code>、<code>generic-error</code>。这些错误通过 <code>/plugin</code> UI 展示给用户，主循环正常继续。</li>
+<li><strong>Manifest 验证失败</strong>：如果 plugin.json 存在但无效，<strong>抛出错误</strong>（这是唯一会中断该插件加载的场景，但仍被 allSettled 隔离）。</li>
+<li><strong>Memoize 缓存</strong>：<code>loadAllPluginsCacheOnly</code> 通过 <code>memoize</code> 缓存，避免重复 I/O；热重载时通过 <code>clearPluginCache()</code> 清除。</li>
+</ol>
+<hr>
+<h3>Q7. 插件的安全边界</h3>
+<p><strong>插件没有进程沙箱</strong>，安全边界通过以下机制实现：</p>
+<ol>
+<li><strong>内容限制（白名单）</strong>：插件只能提供 Markdown 文件（命令/agent 定义）、JSON 配置（hooks）、MCP bundle，<strong>不能执行任意 JavaScript/TypeScript 代码</strong>。这是架构级隔离。</li>
+<li><strong>设置白名单</strong>：插件的 <code>settings.json</code> 只有白名单 key 被接受（<code>PluginSettingsSchema</code> 用 <code>.pick({ agent: true }).strip()</code>），当前仅允许 <code>agent</code> 键。</li>
+<li><strong>路径遍历防护</strong>：<code>validatePathWithinBase()</code> 验证插件声明的路径必须在插件目录内，防止 <code>../</code> 逃逸。</li>
+<li><strong>Marketplace 名称保护</strong>：<code>BLOCKED_OFFICIAL_NAME_PATTERN</code> 阻止第三方伪造 <code>anthropic-marketplace</code> 等官方名称；保留名称必须来自 <code>github.com/anthropics/</code> 组织（<code>validateOfficialNameSource</code>）。</li>
+<li><strong>企业策略</strong>：<code>strictKnownMarketplaces</code>（allowlist）和 <code>blockedMarketplaces</code>（blocklist）双重控制，可配置为只允许来自特定 source 的 marketplace。</li>
+<li><strong>URL 验证</strong>：<code>validateGitUrl()</code> 只允许 HTTPS、HTTP、file://、git@SSH 协议，阻止其他协议。</li>
+<li><strong>Hook 的安全性</strong>：Hook 内容是 JSON 配置（shell 命令路径），实际执行由 Claude Code 主进程的 hooks 系统处理，与普通 settings.json hooks 等同对待。</li>
+</ol>
+<p><strong>本质</strong>：Claude Code 选择&quot;可信内容 + 不可信来源&quot;模型，而非进程级沙箱。插件内容经过结构验证，但一旦通过验证，其 hook 命令可以访问本地系统。</p>
+<hr>
+<h3>Q8. SkillTool.call() 核心逻辑</h3>
+<div class="code-block"><pre>// 两条执行路径：
+
+// 路径 A：fork 模式（command.context === 'fork'）
+executeForkedSkill(command, commandName, args, context, ...)
+  └→ prepareForkedCommandContext(command, args, context)
+       └→ command.getPromptForCommand(args)  // 获取 Markdown 内容
+       └→ skillContent = blocks.join('\n')
+       └→ promptMessages = [createUserMessage({ content: skillContent })]
+  └→ runAgent({ promptMessages, agentDefinition, ... })  // 独立子 Agent
+  └→ 返回 { status: 'forked', result: lastAssistantMessage }
+     // 结果作为 tool result 返回给父 Agent
+
+// 路径 B：inline 模式（默认）
+processPromptSlashCommand(commandName, args, commands, context)
+  └→ command.getPromptForCommand(args)  // 获取 ContentBlockParam[]
+  └→ 构建 newMessages (UserMessage[] with COMMAND_MESSAGE_TAG)
+  └→ tagMessagesWithToolUseID(newMessages, toolUseID)  // 保持 transient 状态
+return {
+  data: { success, commandName, allowedTools, model },
+  newMessages,           // &lt;-- 注入对话的关键
+  contextModifier(ctx) { // 更新 allowedTools / mainLoopModel / effortValue
+    ...
+  }
+}</pre></div><p><strong>关键</strong>：<code>newMessages</code> 是 SkillTool 区别于其他所有工具的特殊能力——返回结果中携带新消息，主循环将这些消息追加到对话历史并重新发 API 请求，使 Skill 内容成为&quot;对话的一部分&quot;。</p>
+<hr>
+<h3>Q9. Skill 注入方式</h3>
+<p><strong>Skill 注入方式是 user 消息</strong>。</p>
+<ul>
+<li>Inline 模式：Skill 内容被封装为 <code>UserMessage</code>，通过 <code>newMessages</code> 返回，追加到对话历史中紧跟 SkillTool 的 tool_result 之后，下一轮 API 请求时模型可见。</li>
+<li>Fork 模式：Skill 内容被封装为 <code>createUserMessage({ content: skillContent })</code>，成为子 Agent 的第一条 user 消息，子 Agent 独立运行，最终结果以 tool result 形式返回父 Agent。</li>
+</ul>
+<p>不是 system prompt（system prompt 在 API 调用前固定，Skill 在调用中动态注入）。不是纯 tool result（虽然 SkillTool 自身返回 tool result，但它额外携带 newMessages 来注入 user 消息）。</p>
+<hr>
+<h3>Q10. 一个 Skill 可以包含哪些元素？</h3>
+<p>从 <code>BundledSkillDefinition</code> 类型（bundledSkills.ts）和 Markdown skill 的 frontmatter schema：</p>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>Markdown disk-based skill 的 YAML frontmatter 支持同等字段，正文中用 <code>$ARGUMENTS</code> 占位符接收参数。</p>
+<hr>
+<h3>Q11. 内置 Skill 示例：debug</h3>
+<p><strong>文件</strong>：<code>src/skills/bundled/debug.ts</code></p>
+<p><strong>结构</strong>：</p>
+<ul>
+<li><code>name: &#39;debug&#39;</code></li>
+<li><code>description</code>：根据用户类型不同（ant 内部用户显示完整调试信息，外部用户只提示启用 debug 日志）</li>
+<li><code>allowedTools: [&#39;Read&#39;, &#39;Grep&#39;, &#39;Glob&#39;]</code></li>
+<li><code>disableModelInvocation: true</code>（只能用户手动 <code>/debug</code> 调用，不能被模型主动触发）</li>
+<li><code>userInvocable: true</code></li>
+</ul>
+<p><strong><code>getPromptForCommand(args)</code> 逻辑</strong>：</p>
+<ol>
+<li>调用 <code>enableDebugLogging()</code> 开启本次会话的调试日志（若未开启）</li>
+<li>读取调试日志文件的最后 64KB（<code>stat → fd.read</code> 尾读，避免大文件 OOM）</li>
+<li>格式化日志为 Markdown 字符串，包括：日志大小、最后 20 行原始内容</li>
+<li>拼接成完整 Markdown 提示，包含：<ul>
+<li>&quot;## Debug Skill&quot; 标题</li>
+<li>可能的&quot;调试日志刚刚启用&quot;提示</li>
+<li>日志文件路径和内容</li>
+<li>用户描述的问题（<code>args</code>）</li>
+<li>设置文件路径（user/project/local 三个层级）</li>
+<li>明确的分步骤指令（读日志 → 查 ERROR/WARN → 分析 → 给出建议）</li>
+</ul>
+</li>
+<li>返回 <code>[{ type: &#39;text&#39;, text: prompt }]</code></li>
+</ol>
+<p>这是一个典型的&quot;动态生成 prompt 注入对话&quot;模式：Skill 在调用时采集环境状态（日志），生成上下文丰富的指令文本，注入为 user 消息，然后 Claude 按指令执行。</p>
+<hr>
+<h3>Q12. 内置 Plugin 示例</h3>
+<p><strong>现状</strong>：<code>src/plugins/bundled/index.ts</code> 中的 <code>initBuiltinPlugins()</code> 函数体当前<strong>为空</strong>，注释说明这是&quot;供用户可开关功能的脚手架，尚未迁移任何 bundled skill&quot;。</p>
+<p><strong>外部 Plugin 的典型结构</strong>（从代码推断）：</p>
+<div class="code-block"><pre>my-plugin/
+├── .claude-plugin/
+│   └── plugin.json          # { name, version, description, author }
+├── commands/
+│   ├── build.md             # /my-plugin:build 命令
+│   └── deploy.md            # /my-plugin:deploy 命令
+├── agents/
+│   └── code-reviewer.md     # 专用 Agent
+├── hooks/
+│   └── hooks.json           # { "hooks": { "PreToolUse": [...] } }
+└── skills/
+    └── analyze/
+        └── SKILL.md         # /my-plugin:analyze 技能</pre></div><p>从 <code>loadPluginHooks.ts</code> 可见，plugin 的 hooks 被转换为 <code>PluginHookMatcher[]</code>，带上 <code>pluginRoot</code>、<code>pluginName</code>、<code>pluginId</code> 上下文，注册到全局 hook 系统，与用户 settings.json 中的 hooks 等同对待。</p>
+<hr>
+<h2>三、Plugin vs Skill 对比表</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<h2>四、Skill 执行路径详解（流程图）</h2>
+<div class="code-block"><pre>用户输入 "/debug some issue"
+         │
+         ▼
+主循环发 API 请求（含 SkillTool 定义 + system-reminder 中的 skill 列表）
+         │
+         ▼
+Claude 决策：调用 SkillTool { skill: "debug", args: "some issue" }
+         │
+         ▼
+SkillTool.validateInput()
+  ├─ 查找 command（getAllCommands → localCommands + mcpSkills）
+  ├─ 检查 command.type === 'prompt'
+  └─ 检查 !disableModelInvocation    ← /debug 设置了此标志，所以模型实际上无法调用！
+         │
+         ▼（以一个无 disableModelInvocation 的 skill 为例，如 /simplify）
+SkillTool.checkPermissions()
+  ├─ 查 deny 规则
+  ├─ 查 allow 规则
+  ├─ skillHasOnlySafeProperties → auto-allow
+  └─ 否则 → 向用户询问权限
+         │
+         ▼
+SkillTool.call()
+  ├─ [fork] executeForkedSkill → runAgent(子 Agent) → tool result
+  └─ [inline] processPromptSlashCommand
+                 └→ command.getPromptForCommand(args)
+                      // 返回 ContentBlockParam[]（Markdown 文本）
+                 └→ 构建 UserMessage（newMessages）
+                 └→ tagMessagesWithToolUseID（标记 transient）
+  └─ return {
+       data: { success, commandName, allowedTools, model },
+       newMessages: [UserMessage(skill content)],
+       contextModifier: (ctx) =&gt; { ... allowedTools / model / effort ... }
+     }
+         │
+         ▼
+主循环处理 ToolResult
+  ├─ 追加 newMessages 到对话历史
+  ├─ contextModifier 更新 ToolUseContext
+  └─ 发下一轮 API 请求（包含 Skill 的 user 消息内容）
+         │
+         ▼
+Claude 看到 Skill 内容，按指令执行任务</pre></div><hr>
+<h2>五、关键设计发现</h2>
+<h3>5.1 Skill 列表的上下文预算管理</h3>
+<p><code>prompt.ts</code> 中有精细的 context budget 管理：</p>
+<ul>
+<li>Skill 列表占总 context window 的 <strong>1%</strong>（<code>SKILL_BUDGET_CONTEXT_PERCENT = 0.01</code>）</li>
+<li>每个条目硬性上限 <strong>250 字符</strong>（<code>MAX_LISTING_DESC_CHARS = 250</code>），确保发现效率不浪费 turn-1 cache tokens</li>
+<li>Bundled skills 永不截断；non-bundled skills 在超预算时逐步退化（先截短描述，再降为仅名称）</li>
+<li>这是一个显式的&quot;发现列表 vs 执行内容&quot;分离设计：列表只做索引，完整内容在调用时才加载</li>
+</ul>
+<h3>5.2 addInvokedSkill 与 registerSkillHooks 的时机</h3>
+<p><code>processPromptSlashCommand</code> 内部会调用 <code>addInvokedSkill</code>（记录 skill 被调用）和 <code>registerSkillHooks</code>（注册 skill 级别的 hooks）。SkillTool.call 的注释明确说明不要重复调用——这保证了 hook 注册的幂等性。</p>
+<h3>5.3 ZIP 缓存 + Seed 缓存（CCR 环境优化）</h3>
+<p>远程运行环境（CCR）预置 plugin 内容到镜像中（Seed 缓存），启动时直接读取，无需网络克隆。ZIP 缓存将目录压缩为单文件以减少 IOPS（文件数量影响文件系统性能）。</p>
+<h3>5.4 Plugin 热重载</h3>
+<p><code>skillChangeDetector.ts</code> 用 chokidar 监听 <code>~/.claude/skills/</code>、<code>.claude/skills/</code> 等目录，检测到 <code>.md</code> 文件变更后，300ms 防抖后触发：</p>
+<ol>
+<li><code>clearSkillCaches()</code> + <code>clearCommandsCache()</code> 清除缓存</li>
+<li><code>executeConfigChangeHooks(&#39;skills&#39;, path)</code> 触发 ConfigChange hooks</li>
+<li><code>skillsChanged.emit()</code> 通知订阅者</li>
+</ol>
+<p>注意：Bun 的 fs.watch() 存在 deadlock bug（oven-sh/bun#27469），强制使用 polling 模式（<code>USE_POLLING = typeof Bun !== &#39;undefined&#39;</code>）。</p>
+<hr>
+<h2>六、模式卡片 #8：插件热加载与能力扩展</h2>
+<div class="code-block"><pre>## 模式卡片 #8：插件热加载与能力扩展
+
+### 问题
+如何在不修改核心代码、不重启进程的情况下，让 agent 获得新的行为能力？
+同时，如何防止第三方扩展破坏核心系统的稳定性或安全性？
+
+### 方案：Plugin + Skill 双轨扩展机制
+
+**Plugin 轨道**（结构化包扩展）：
+- 插件是纯文件系统包（Markdown + JSON），不含可执行代码
+- 通过 marketplace 机制分发，支持 npm / git / GitHub / 本地路径
+- 安装后缓存到 `~/.claude/plugins/cache/`，版本化存储
+- 启动时并行加载所有 enabled plugins，错误隔离（Promise.allSettled）
+
+**Skill 轨道**（行为注入扩展）：
+- Skill 是命名的 `getPromptForCommand()` 函数，返回 Markdown 文本
+- 调用时将文本以 user 消息形式注入对话，无需重新构建 system prompt
+- Chokidar 文件监听实现热重载（300ms 防抖，Bun 下降级为 polling）
+
+### 关键设计决策：为什么 Plugin（代码扩展）和 Skill（行为扩展）要分离？
+
+1. **安全分层**：Plugin 是"配置发布单元"，Skill 是"执行单元"。Plugin 不能执行代码（无 TypeScript 文件），只能声明内容。这样插件仓库无法注入恶意代码，只能提供 Markdown 指令。
+2. **职责分离**：Plugin 解决"如何打包和分发"，Skill 解决"如何改变模型行为"。两者可以组合（Plugin 内携带 Skill），也可以独立（Bundled Skill 不依赖 Plugin 机制）。
+3. **粒度不同**：Plugin 是"组件集合"（一个 Plugin 可含多个 commands + hooks + MCP 服务器），Skill 是"单一行为"（一个 Skill 完成一件事）。
+
+### 加载隔离：插件失败如何不影响主系统？
+
+1. `Promise.allSettled` 并行加载，单个失败不中断其他插件
+2. 错误收集到 `PluginError[]` 数组，不抛出异常
+3. 路径不存在等非致命错误：记录 error，跳过该组件，插件其余部分正常加载
+4. Manifest 格式错误等致命错误：该插件加载失败，系统继续，用户在 `/plugin` UI 中看到错误提示
+5. Memoize 缓存避免重复 I/O，热重载时显式清除缓存
+
+### 适用条件
+
+- 需要向 AI agent 分发可复用行为模式（/commit、/review、/deploy）
+- 需要在不同项目/团队间共享工具集
+- 需要在不修改核心二进制的前提下扩展 agent 能力
+- 需要用户可自定义和启用/禁用特定功能
+
+### 权衡
+
+| 优势 | 代价 |
+|------|------|
+| 无代码插件：安全边界清晰 | 无法执行复杂逻辑（需要 bundled skill 或 MCP 工具） |
+| 热重载：无需重启 | 热重载存在 300ms 延迟 + Bun polling 性能损耗 |
+| 版本化缓存：稳定性 | 缓存管理复杂（版本化 + ZIP + Seed 三层缓存） |
+| 错误隔离：主系统不受影响 | 错误信息需通过 `/plugin` UI 查看，不在主对话中显示 |
+| Context budget 管理：不浪费 token | 非 bundled skill 描述可能被截断，降低发现准确率 |</pre></div><hr>
+<h2>七、参考文件索引</h2>
+<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+    </div>
+  </main>
+</div>
+
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
+
+</body>
+</html>
