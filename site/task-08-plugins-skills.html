@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -205,7 +233,19 @@ body{animation:flicker 8s infinite}
 </blockquote>
 <hr>
 <h2>一、Plugin vs Skill 本质区别（一句话定义）</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>核心区别</strong>：Plugin 是安装时注册的<strong>结构化包</strong>（声明式），Skill 是运行时触发的<strong>行为注入</strong>（命令式）。Plugin 可以携带 Skill（commands/ 目录下的 Markdown 即为 Skill 内容），但 Skill 不依赖 Plugin 机制也可以独立注册（bundled skills 用 TypeScript 代码直接注册）。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>机制</th>
+<th>本质定义</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>Plugin</strong></td>
+<td>一个<strong>文件系统包</strong>（目录 + 可选 plugin.json），从外部来源（marketplace / git / npm / 本地路径）安装，向系统注册 <strong>commands（Markdown 文件）、agents（Markdown 文件）、hooks（JSON 配置）、MCP 服务器（.mcpb/.dxt）、输出样式</strong>等结构化组件；自身不含可执行 TypeScript 代码，是&quot;配置包&quot;。</td>
+</tr>
+<tr>
+<td><strong>Skill</strong></td>
+<td>一个<strong>行为单元</strong>，其核心是一个 <code>getPromptForCommand(args)</code> 函数，被调用时返回 <code>ContentBlockParam[]</code>（纯文本块）；执行时内容以 <strong>user 消息</strong>形式注入到当前对话，驱动 Claude 完成特定任务。Skill 是&quot;行为扩展点&quot;。</td>
+</tr>
+</tbody></table></div><p><strong>核心区别</strong>：Plugin 是安装时注册的<strong>结构化包</strong>（声明式），Skill 是运行时触发的<strong>行为注入</strong>（命令式）。Plugin 可以携带 Skill（commands/ 目录下的 Markdown 即为 Skill 内容），但 Skill 不依赖 Plugin 机制也可以独立注册（bundled skills 用 TypeScript 代码直接注册）。</p>
 <hr>
 <h2>二、全面回答 12 个问题</h2>
 <h3>Q1. Plugin 和 Skill 各自是什么？</h3>
@@ -213,7 +253,47 @@ body{animation:flicker 8s infinite}
 <p><strong>Skill</strong>：一个可被模型通过 <code>SkillTool</code>（<code>tool_use</code> 类型）调用的命名行为单元。每个 Skill 有 <code>name</code>、<code>description</code>、可选的 <code>allowedTools</code>、可选的 <code>model</code> 以及核心的 <code>getPromptForCommand(args)</code> 函数。调用后函数返回 Markdown 文本块，这些文本块以 <strong>user 消息</strong>的形式注入到对话流。</p>
 <h3>Q2. Plugin 可以注册哪些类型的扩展？</h3>
 <p>从 <code>createPluginFromPath</code>（pluginLoader.ts:1348）及相关 schema 可以确认：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h3>Q3. Skill 的内容格式是什么？执行时发生了什么？</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>类型</th>
+<th>目录/文件</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td>Commands（斜杠命令）</td>
+<td><code>commands/</code> 目录或 manifest.commands</td>
+<td>Markdown 文件，每个文件成为一个 <code>/plugin:name</code> 命令</td>
+</tr>
+<tr>
+<td>Agents（自定义 Agent）</td>
+<td><code>agents/</code> 目录或 manifest.agents</td>
+<td>Markdown 文件，定义专用 Agent</td>
+</tr>
+<tr>
+<td>Hooks（生命周期钩子）</td>
+<td><code>hooks/hooks.json</code> 或 manifest.hooks</td>
+<td>JSON 配置，响应 PreToolUse / PostToolUse 等 ~20 种事件</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td><code>skills/</code> 目录</td>
+<td>Markdown 文件，注册为 Skill（与 commands/ 类似但走 Skill 路径）</td>
+</tr>
+<tr>
+<td>MCP 服务器</td>
+<td><code>.mcpb</code> / <code>.dxt</code> 文件</td>
+<td>MCP bundle，提供工具给模型</td>
+</tr>
+<tr>
+<td>Output Styles（输出样式）</td>
+<td><code>output-styles/</code> 目录</td>
+<td>控制输出格式</td>
+</tr>
+<tr>
+<td>Plugin 设置</td>
+<td><code>settings.json</code> 或 manifest.settings</td>
+<td>仅允许白名单 key（当前仅 <code>agent</code>）</td>
+</tr>
+</tbody></table></div><h3>Q3. Skill 的内容格式是什么？执行时发生了什么？</h3>
 <p><strong>内容格式</strong>：Skill 内容格式灵活，但核心载体是 <strong>Markdown 文本</strong>（<code>ContentBlockParam[]</code>，实际为 <code>{ type: &#39;text&#39;, text: string }[]</code>）。</p>
 <ul>
 <li><strong>Bundled skills</strong>（<code>src/skills/bundled/</code>）：TypeScript 函数，<code>getPromptForCommand(args)</code> 动态生成 Markdown 字符串。例如 <code>debug.ts</code> 会读取调试日志尾部内容后拼接成 Markdown 指令返回。</li>
@@ -339,7 +419,87 @@ return {
 <hr>
 <h3>Q10. 一个 Skill 可以包含哪些元素？</h3>
 <p>从 <code>BundledSkillDefinition</code> 类型（bundledSkills.ts）和 Markdown skill 的 frontmatter schema：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>Markdown disk-based skill 的 YAML frontmatter 支持同等字段，正文中用 <code>$ARGUMENTS</code> 占位符接收参数。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>元素</th>
+<th>来源</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>name</code></td>
+<td>必填</td>
+<td>Skill 的名称，即 <code>/name</code> 命令</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>必填</td>
+<td>简短描述，显示在 Skill 列表</td>
+</tr>
+<tr>
+<td><code>whenToUse</code></td>
+<td>可选</td>
+<td>告诉模型何时调用此 Skill（列表中显示为 <code>${description} - ${whenToUse}</code>）</td>
+</tr>
+<tr>
+<td><code>allowedTools</code></td>
+<td>可选</td>
+<td>Skill 执行期间自动 allow 的工具列表（如 <code>[&#39;Read&#39;, &#39;Grep&#39;]</code>）</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>可选</td>
+<td>覆盖执行此 Skill 时使用的模型</td>
+</tr>
+<tr>
+<td><code>argumentHint</code></td>
+<td>可选</td>
+<td>参数提示（如 <code>[issue description]</code>）</td>
+</tr>
+<tr>
+<td><code>aliases</code></td>
+<td>可选</td>
+<td>别名列表</td>
+</tr>
+<tr>
+<td><code>disableModelInvocation</code></td>
+<td>可选</td>
+<td>为 true 时，模型无法通过 SkillTool 调用（只能用户手动输入）</td>
+</tr>
+<tr>
+<td><code>userInvocable</code></td>
+<td>可选</td>
+<td>是否在用户 UI 中显示</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td>可选</td>
+<td><code>&#39;inline&#39;</code>（默认）或 <code>&#39;fork&#39;</code>（独立子 Agent 执行）</td>
+</tr>
+<tr>
+<td><code>agent</code></td>
+<td>可选</td>
+<td>fork 模式下使用哪个 agent 类型</td>
+</tr>
+<tr>
+<td><code>hooks</code></td>
+<td>可选</td>
+<td>Skill 级别的 hooks 配置</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>可选</td>
+<td>Bundled skills 可携带参考文件，首次调用时解压到磁盘</td>
+</tr>
+<tr>
+<td><code>effort</code></td>
+<td>可选</td>
+<td>思考努力程度（从 Markdown frontmatter 读取）</td>
+</tr>
+<tr>
+<td><code>getPromptForCommand</code></td>
+<td>必填</td>
+<td>核心函数，接受 args 返回 <code>ContentBlockParam[]</code></td>
+</tr>
+</tbody></table></div><p>Markdown disk-based skill 的 YAML frontmatter 支持同等字段，正文中用 <code>$ARGUMENTS</code> 占位符接收参数。</p>
 <hr>
 <h3>Q11. 内置 Skill 示例：debug</h3>
 <p><strong>文件</strong>：<code>src/skills/bundled/debug.ts</code></p>
@@ -387,7 +547,47 @@ return {
         └── SKILL.md         # /my-plugin:analyze 技能</pre></div><p>从 <code>loadPluginHooks.ts</code> 可见，plugin 的 hooks 被转换为 <code>PluginHookMatcher[]</code>，带上 <code>pluginRoot</code>、<code>pluginName</code>、<code>pluginId</code> 上下文，注册到全局 hook 系统，与用户 settings.json 中的 hooks 等同对待。</p>
 <hr>
 <h2>三、Plugin vs Skill 对比表</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>Plugin</th>
+<th>Skill</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>本质</strong></td>
+<td>文件系统包（目录 + 可选清单），声明式扩展容器</td>
+<td>命名行为单元，运行时调用 <code>getPromptForCommand()</code> 注入 user 消息</td>
+</tr>
+<tr>
+<td><strong>内容格式</strong></td>
+<td>目录结构：<code>commands/*.md</code>、<code>agents/*.md</code>、<code>hooks/hooks.json</code>、<code>.mcpb</code>，以 JSON 清单描述</td>
+<td>主体是 Markdown 文本（可动态生成）；Bundled Skill 用 TypeScript 函数；Disk Skill 是 <code>SKILL.md</code> 文件（YAML frontmatter + Markdown 正文）</td>
+</tr>
+<tr>
+<td><strong>加载时机</strong></td>
+<td><strong>启动时</strong>加载并缓存（<code>loadAllPluginsCacheOnly()</code> memoized），热重载由 <code>skillChangeDetector</code> 触发</td>
+<td>Bundled skill 在 <strong>CLI 启动时</strong> 注册（<code>initBundledSkills()</code>）；Disk/Plugin skill 在首次查询时懒加载；MCP skill 从 AppState 实时读取</td>
+</tr>
+<tr>
+<td><strong>可注册内容</strong></td>
+<td>Commands、Agents、Hooks、Skills、MCP servers、Output styles、Settings（白名单）</td>
+<td>一个 <code>getPromptForCommand</code> 函数 + 元数据（<code>allowedTools</code>、<code>model</code>、<code>effort</code>、<code>context</code> 等）</td>
+</tr>
+<tr>
+<td><strong>隔离方式</strong></td>
+<td>无进程沙箱；架构级内容限制（只接受 Markdown + JSON 配置，不执行代码）；路径遍历防护；Marketplace 名称防仿冒；企业 policy 控制来源</td>
+<td>Inline 模式：在父 Agent 对话流内（共享 context）；Fork 模式：在隔离子 Agent 内运行（独立 ToolUseContext，mutable state 隔离）</td>
+</tr>
+<tr>
+<td><strong>典型用途</strong></td>
+<td>分发一组相关命令/工具给团队，如代码审查插件（包含 review 命令 + pre-tool-use hooks）；提供专用 MCP 工具服务器</td>
+<td>封装可复用的 AI 行为模式，如 <code>/debug</code>（读日志 + 分析）、<code>/simplify</code>（代码质量审查）、<code>/commit</code>（生成 commit 消息）</td>
+</tr>
+<tr>
+<td><strong>来源</strong></td>
+<td>npm 包、GitHub 仓库、git URL（稀疏克隆支持）、本地路径</td>
+<td>Bundled（编译进二进制）、Disk（<code>~/.claude/skills/</code> 或项目 <code>.claude/skills/</code>）、Plugin 携带（plugin 的 skills/ 目录）、MCP 协议提供</td>
+</tr>
+</tbody></table></div><hr>
 <h2>四、Skill 执行路径详解（流程图）</h2>
 <div class="code-block"><pre>用户输入 "/debug some issue"
          │
@@ -505,7 +705,67 @@ Claude 看到 Skill 内容，按指令执行任务</pre></div><hr>
 | 错误隔离：主系统不受影响 | 错误信息需通过 `/plugin` UI 查看，不在主对话中显示 |
 | Context budget 管理：不浪费 token | 非 bundled skill 描述可能被截断，降低发现准确率 |</pre></div><hr>
 <h2>七、参考文件索引</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+<div class="table-wrap"><table><thead><tr>
+<th>文件</th>
+<th>作用</th>
+</tr>
+</thead><tbody><tr>
+<td><code>src/utils/plugins/pluginLoader.ts</code></td>
+<td>核心 Plugin 加载逻辑（2400+ 行）：发现、克隆、验证、缓存</td>
+</tr>
+<tr>
+<td><code>src/utils/plugins/loadPluginCommands.ts</code></td>
+<td>Plugin commands 目录扫描与转换为 Command 对象</td>
+</tr>
+<tr>
+<td><code>src/utils/plugins/loadPluginHooks.ts</code></td>
+<td>Plugin hooks 注册与热重载订阅</td>
+</tr>
+<tr>
+<td><code>src/utils/plugins/schemas.ts</code></td>
+<td>Plugin 所有 Zod schema（PluginManifestSchema、CommandMetadataSchema 等）</td>
+</tr>
+<tr>
+<td><code>src/tools/SkillTool/SkillTool.ts</code></td>
+<td>SkillTool 完整实现：validateInput、checkPermissions、call</td>
+</tr>
+<tr>
+<td><code>src/tools/SkillTool/prompt.ts</code></td>
+<td>Skill 列表格式化 + context budget 管理</td>
+</tr>
+<tr>
+<td><code>src/tools/SkillTool/constants.ts</code></td>
+<td><code>SKILL_TOOL_NAME = &#39;Skill&#39;</code></td>
+</tr>
+<tr>
+<td><code>src/utils/skills/skillChangeDetector.ts</code></td>
+<td>Skill 文件热重载（chokidar + debounce + Bun polling 降级）</td>
+</tr>
+<tr>
+<td><code>src/skills/bundledSkills.ts</code></td>
+<td><code>registerBundledSkill()</code> 函数 + <code>BundledSkillDefinition</code> 类型</td>
+</tr>
+<tr>
+<td><code>src/skills/bundled/index.ts</code></td>
+<td>所有 bundled skill 的注册入口</td>
+</tr>
+<tr>
+<td><code>src/skills/bundled/debug.ts</code></td>
+<td>典型 bundled skill 示例（动态 prompt 生成）</td>
+</tr>
+<tr>
+<td><code>src/skills/bundled/loremIpsum.ts</code></td>
+<td>简单 bundled skill 示例（参数处理 + 内容生成）</td>
+</tr>
+<tr>
+<td><code>src/plugins/bundled/index.ts</code></td>
+<td>Built-in plugin 入口（当前为空脚手架）</td>
+</tr>
+<tr>
+<td><code>src/utils/forkedAgent.ts</code></td>
+<td><code>prepareForkedCommandContext()</code> + fork 模式支持</td>
+</tr>
+</tbody></table></div>
     </div>
   </main>
 </div>

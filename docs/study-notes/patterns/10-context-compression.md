@@ -2,7 +2,7 @@
 ---
 # 模式卡片 #10：上下文压缩触发与摘要注入
 
-**来源子系统**：上下文与内存管理（Memory）
+**来源子系统**：上下文与记忆管理（Memory）
 **Claude Code 关键文件**：`src/services/compact/autoCompact.ts`，`src/services/compact/compact.ts`，`src/services/compact/prompt.ts`
 
 ---

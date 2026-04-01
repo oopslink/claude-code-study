@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -247,7 +275,47 @@ body{animation:flicker 8s infinite}
 <hr>
 <h3>子系统 3：多智能体</h3>
 <p><strong>Task 具体类型</strong>（来自 <code>src/Task.ts</code> + <code>src/tasks/types.ts</code> + 目录结构）：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>还有一个特殊文件 <code>LocalMainSessionTask.ts</code>，对应主会话自身（不在 TaskType 枚举中）。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>TaskType 字面量</th>
+<th>ID 前缀</th>
+<th>对应实现</th>
+</tr>
+</thead><tbody><tr>
+<td><code>local_bash</code></td>
+<td><code>b</code></td>
+<td><code>LocalShellTask/</code>（目录）</td>
+</tr>
+<tr>
+<td><code>local_agent</code></td>
+<td><code>a</code></td>
+<td><code>LocalAgentTask/</code>（目录）</td>
+</tr>
+<tr>
+<td><code>remote_agent</code></td>
+<td><code>r</code></td>
+<td><code>RemoteAgentTask/</code>（目录）</td>
+</tr>
+<tr>
+<td><code>in_process_teammate</code></td>
+<td><code>t</code></td>
+<td><code>InProcessTeammateTask/</code>（目录）</td>
+</tr>
+<tr>
+<td><code>local_workflow</code></td>
+<td><code>w</code></td>
+<td><code>LocalWorkflowTask/</code>（目录，在 types.ts 引用）</td>
+</tr>
+<tr>
+<td><code>monitor_mcp</code></td>
+<td><code>m</code></td>
+<td><code>MonitorMcpTask/</code>（目录，在 types.ts 引用）</td>
+</tr>
+<tr>
+<td><code>dream</code></td>
+<td><code>d</code></td>
+<td><code>DreamTask/</code>（目录）</td>
+</tr>
+</tbody></table></div><p>还有一个特殊文件 <code>LocalMainSessionTask.ts</code>，对应主会话自身（不在 TaskType 枚举中）。</p>
 <p><strong>TaskStatus</strong>：<code>pending | running | completed | failed | killed</code></p>
 <p><code>tasks/</code> 目录完整结构：</p>
 <div class="code-block"><pre>src/tasks/
@@ -279,9 +347,9 @@ body{animation:flicker 8s infinite}
   SkillTool.ts   （工具实现主文件）
   UI.tsx</pre></div><p><code>SkillTool.ts</code> 前 30 行显示它从 <code>src/commands.js</code>、<code>src/Tool.js</code> 等导入，是 Skill 子系统与工具系统的桥接点。Plugin 负责外部扩展的安装管理，Skill 负责具体能力的加载与执行，SkillTool 是 AI 模型调用 Skill 的工具接口。</p>
 <hr>
-<h3>子系统 5：上下文与内存管理</h3>
+<h3>子系统 5：上下文与记忆管理</h3>
 <p><strong>memdir.ts 管理的内存类型</strong>：</p>
-<p><code>src/memdir/memdir.ts</code> 管理的是<strong>持久化文件内存</strong>（磁盘上的 <code>MEMORY.md</code>）：</p>
+<p><code>src/memdir/memdir.ts</code> 管理的是<strong>持久化文件记忆</strong>（磁盘上的 <code>MEMORY.md</code>）：</p>
 <ul>
 <li>入口文件名：<code>MEMORY.md</code>（常量 <code>ENTRYPOINT_NAME</code>）</li>
 <li>最大行数限制：200 行（<code>MAX_ENTRYPOINT_LINES</code>）</li>
@@ -382,7 +450,7 @@ export function getAutoCompactThreshold(model: string): number</pre></div><p><co
 <h2>系统边界图</h2>
 <div class="code-block"><pre>[子系统 1：Agent 核心循环]
   ├── 直接依赖 → [子系统 2：工具系统]（执行 tool_use 块）
-  ├── 直接依赖 → [子系统 5：上下文/内存管理]（注入 memdir、触发 autoCompact）
+  ├── 直接依赖 → [子系统 5：上下文/记忆管理]（注入 memdir、触发 autoCompact）
   ├── 直接依赖 → [子系统 6：安全/沙箱]（通过 canUseTool 检查权限）
   ├── 直接依赖 → [子系统 3：多智能体]（AgentTool 产生子任务）
   ├── 提供给 → CLI 入口（query() 函数）/ SDK 入口（QueryEngine.submitMessage()）
@@ -406,7 +474,7 @@ export function getAutoCompactThreshold(model: string): number</pre></div><p><co
   ├── 提供给 → [子系统 1：Agent 核心循环]（QueryEngine 预加载插件缓存）
   └── 数据流：Plugin 安装/配置 → Skill 目录加载 → SkillTool 暴露给 LLM
 
-[子系统 5：上下文与内存管理]
+[子系统 5：上下文与记忆管理]
   ├── 直接依赖 → [子系统 1：Agent 核心循环]（memdir 注入系统提示，compact 裁剪消息历史）
   ├── 提供给 → [子系统 1：Agent 核心循环]（内存提示内容、压缩后消息列表）
   └── 数据流：MEMORY.md → loadMemoryPrompt() → SystemPrompt 注入
@@ -420,7 +488,7 @@ export function getAutoCompactThreshold(model: string): number</pre></div><p><co
 <h2>核心节点分析</h2>
 <p><strong>核心枢纽（被多个系统依赖）</strong>：</p>
 <ol>
-<li><p><strong>子系统 1：Agent 核心循环</strong> — 最核心的枢纽。所有其他子系统最终都服务于它：工具系统提供执行能力，内存管理提供上下文，安全沙箱提供护栏，多智能体在其内部嵌套运行，插件/技能通过 SkillTool 接入。<code>query()</code> 是整个系统的生命线。</p>
+<li><p><strong>子系统 1：Agent 核心循环</strong> — 最核心的枢纽。所有其他子系统最终都服务于它：工具系统提供执行能力，记忆管理提供上下文，安全沙箱提供护栏，多智能体在其内部嵌套运行，插件/技能通过 SkillTool 接入。<code>query()</code> 是整个系统的生命线。</p>
 </li>
 <li><p><strong>子系统 2：工具系统</strong> — 第二核心枢纽。作为 Agent 能力的载体，连接安全层（BashTool）、技能层（SkillTool）和多智能体层（AgentTool）。<code>getTools()</code> 是工具注册的单一真相来源。</p>
 </li>
@@ -429,7 +497,7 @@ export function getAutoCompactThreshold(model: string): number</pre></div><p><co
 <ol start="3">
 <li><p><strong>子系统 3：多智能体</strong> — 既依赖核心循环（子任务内部运行 query()），也被核心循环依赖（AgentTool 触发子任务）。形成递归结构。</p>
 </li>
-<li><p><strong>子系统 5：上下文与内存管理</strong> — 为核心循环提供服务，autoCompact 的触发点在 query.ts 内部，形成单向依赖。</p>
+<li><p><strong>子系统 5：上下文与记忆管理</strong> — 为核心循环提供服务，autoCompact 的触发点在 query.ts 内部，形成单向依赖。</p>
 </li>
 </ol>
 <p><strong>叶子节点（只提供服务，不依赖其他子系统）</strong>：</p>

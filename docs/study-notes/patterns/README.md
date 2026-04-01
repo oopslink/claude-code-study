@@ -18,8 +18,8 @@
 | 6 | [多层防御安全模型](#6-多层防御安全模型) | 安全与沙箱 | 如何保证 LLM 生成的 bash 命令不破坏用户系统？ | [06-multi-layer-security-defense.md](06-multi-layer-security-defense.md) |
 | 7 | [声明式权限规则引擎](#7-声明式权限规则引擎) | 安全与沙箱 | 如何让用户可配置地控制工具权限，而不需要改代码？ | [07-declarative-permission-rules.md](07-declarative-permission-rules.md) |
 | 8 | [插件热加载与能力扩展](#8-插件热加载与能力扩展) | 插件与技能系统 | 如何在不修改核心代码、不重启进程的情况下，让 agent 获得新能力？ | [08-plugin-hot-loading.md](08-plugin-hot-loading.md) |
-| 9 | [分层内存架构](#9-分层内存架构) | 上下文与内存管理 | 如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？ | [09-layered-memory-architecture.md](09-layered-memory-architecture.md) |
-| 10 | [上下文压缩触发与摘要注入](#10-上下文压缩触发与摘要注入) | 上下文与内存管理 | Context window 有限，如何在长对话中不丢失重要信息？ | [10-context-compression.md](10-context-compression.md) |
+| 9 | [分层记忆架构](#9-分层记忆架构) | 上下文与记忆管理 | 如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？ | [09-layered-memory-architecture.md](09-layered-memory-architecture.md) |
+| 10 | [上下文压缩触发与摘要注入](#10-上下文压缩触发与摘要注入) | 上下文与记忆管理 | Context window 有限，如何在长对话中不丢失重要信息？ | [10-context-compression.md](10-context-compression.md) |
 
 ---
 
@@ -105,7 +105,7 @@
 
 ---
 
-### 9. 分层内存架构
+### 9. 分层记忆架构
 
 **问题摘要**：如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？
 

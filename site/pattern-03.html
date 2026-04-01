@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -210,7 +238,27 @@ body{animation:flicker 8s infinite}
 <p><strong>AgentTool 的具体实现</strong>：子 agent 每产出一条消息，<code>runAgent</code> generator yield 该消息，AgentTool 的 while 循环收到后调用 <code>onProgress({ data: { type: &#39;agent_progress&#39;, message } })</code>，UI 的 <code>renderToolUseProgressMessage</code> 将其渲染为可折叠的消息列表。</p>
 <h2>关键设计决策</h2>
 <p><strong>onProgress 回调 vs 其他方案的比较：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>onProgress 回调是最轻量的解耦方案：工具代码保持纯函数风格，框架通过闭包注入 UI 更新逻辑，双方通过 <code>ToolProgressData</code> 类型契约通信。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>方案</th>
+<th>分析</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>onProgress 回调（现方案）</strong></td>
+<td>函数注入，工具不持有框架引用；类型参数 <code>P</code> 限定进度类型；无需额外基础设施；与 async/await 自然组合</td>
+</tr>
+<tr>
+<td>EventEmitter</td>
+<td>工具需要继承 EventEmitter 类；事件名是字符串（类型不安全）；需要手动清理监听器（内存泄漏风险）</td>
+</tr>
+<tr>
+<td>RxJS Observable</td>
+<td>强大但是重量级依赖；与现有 async/await 代码混用摩擦大</td>
+</tr>
+<tr>
+<td>AsyncGenerator（直接）</td>
+<td><code>runAgent</code> 内部用了 AsyncGenerator；但在工具接口层用 Generator 会破坏 <code>call()</code> 返回 <code>Promise&lt;ToolResult&gt;</code> 的统一签名</td>
+</tr>
+</tbody></table></div><p>onProgress 回调是最轻量的解耦方案：工具代码保持纯函数风格，框架通过闭包注入 UI 更新逻辑，双方通过 <code>ToolProgressData</code> 类型契约通信。</p>
 <h2>适用条件</h2>
 <ul>
 <li>执行时间超过秒级的工具</li>

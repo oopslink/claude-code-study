@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -230,12 +258,207 @@ type Message =
   | StreamEvent               // type: 'stream_event'（流式中间态）
   | RequestStartEvent         // type: 'stream_request_start'（流式请求开始）</pre></div><h3>各消息类型关键字段</h3>
 <h4>UserMessage（type: &#39;user&#39;）</h4>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>关键辨别</strong>：<code>isHumanTurn(m)</code> = <code>m.type === &#39;user&#39; &amp;&amp; !m.isMeta &amp;&amp; m.toolUseResult === undefined</code>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>type</code></td>
+<td><code>&#39;user&#39;</code></td>
+<td>辨别式</td>
+</tr>
+<tr>
+<td><code>uuid</code></td>
+<td><code>UUID</code></td>
+<td>唯一标识</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td><code>string</code></td>
+<td>ISO 时间戳</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>{ role: &#39;user&#39;; content: string | ContentBlockParam[] }</code></td>
+<td>API 消息体</td>
+</tr>
+<tr>
+<td><code>isMeta</code></td>
+<td><code>true?</code></td>
+<td>是否是元消息（不显示给用户的内部消息）</td>
+</tr>
+<tr>
+<td><code>isVisibleInTranscriptOnly</code></td>
+<td><code>true?</code></td>
+<td>仅在 transcript 模式显示</td>
+</tr>
+<tr>
+<td><code>isVirtual</code></td>
+<td><code>true?</code></td>
+<td>虚拟消息（不发给 API）</td>
+</tr>
+<tr>
+<td><code>isCompactSummary</code></td>
+<td><code>true?</code></td>
+<td>压缩摘要消息</td>
+</tr>
+<tr>
+<td><code>toolUseResult</code></td>
+<td><code>unknown?</code></td>
+<td>工具调用结果（<code>tool_result</code> 消息时存在）</td>
+</tr>
+<tr>
+<td><code>mcpMeta</code></td>
+<td><code>{ _meta?; structuredContent? }?</code></td>
+<td>MCP 协议元数据（不发给模型）</td>
+</tr>
+<tr>
+<td><code>sourceToolAssistantUUID</code></td>
+<td><code>UUID?</code></td>
+<td>对应 <code>tool_use</code> 所在的 assistant 消息 UUID</td>
+</tr>
+<tr>
+<td><code>permissionMode</code></td>
+<td><code>PermissionMode?</code></td>
+<td>发送时的权限模式（用于 rewind 恢复）</td>
+</tr>
+<tr>
+<td><code>summarizeMetadata</code></td>
+<td><code>{ messagesSummarized; userContext?; direction? }?</code></td>
+<td>摘要元数据</td>
+</tr>
+<tr>
+<td><code>origin</code></td>
+<td><code>MessageOrigin?</code></td>
+<td>来源（undefined = 用户键盘输入）</td>
+</tr>
+<tr>
+<td><code>imagePasteIds</code></td>
+<td><code>number[]?</code></td>
+<td>粘贴图片 ID 列表</td>
+</tr>
+</tbody></table></div><p><strong>关键辨别</strong>：<code>isHumanTurn(m)</code> = <code>m.type === &#39;user&#39; &amp;&amp; !m.isMeta &amp;&amp; m.toolUseResult === undefined</code>
 即 <code>UserMessage</code> 同时承担&quot;人类对话轮次&quot;和&quot;工具结果回传&quot;两种角色。</p>
 <h4>AssistantMessage（type: &#39;assistant&#39;）</h4>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ToolUseBlock</strong>（<code>BetaToolUseBlock</code>，来自 Anthropic SDK）：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ToolResultBlock</strong>（<code>ToolResultBlockParam</code>，来自 Anthropic SDK）：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h4>ProgressMessage（type: &#39;progress&#39;）</h4>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>type</code></td>
+<td><code>&#39;assistant&#39;</code></td>
+<td>辨别式</td>
+</tr>
+<tr>
+<td><code>uuid</code></td>
+<td><code>UUID</code></td>
+<td>唯一标识</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td><code>string</code></td>
+<td>ISO 时间戳</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>BetaMessage</code></td>
+<td>API 响应消息体（含 content blocks、usage 等）</td>
+</tr>
+<tr>
+<td><code>message.content</code></td>
+<td><code>BetaContentBlock[]</code></td>
+<td>内容块数组（text、tool_use、thinking 等）</td>
+</tr>
+<tr>
+<td><code>message.usage</code></td>
+<td><code>BetaUsage</code></td>
+<td>Token 用量</td>
+</tr>
+<tr>
+<td><code>message.model</code></td>
+<td><code>string</code></td>
+<td>响应模型名</td>
+</tr>
+<tr>
+<td><code>message.stop_reason</code></td>
+<td><code>string</code></td>
+<td>停止原因</td>
+</tr>
+<tr>
+<td><code>requestId</code></td>
+<td><code>string?</code></td>
+<td>API 请求 ID</td>
+</tr>
+<tr>
+<td><code>apiError</code></td>
+<td>（见 SDK 类型）?</td>
+<td>API 错误信息</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>SDKAssistantMessageError?</code></td>
+<td>SDK 层错误</td>
+</tr>
+<tr>
+<td><code>errorDetails</code></td>
+<td><code>string?</code></td>
+<td>错误详情文本</td>
+</tr>
+<tr>
+<td><code>isApiErrorMessage</code></td>
+<td><code>boolean</code></td>
+<td>是否是 API 错误消息</td>
+</tr>
+<tr>
+<td><code>isVirtual</code></td>
+<td><code>true?</code></td>
+<td>虚拟消息标记</td>
+</tr>
+</tbody></table></div><p><strong>ToolUseBlock</strong>（<code>BetaToolUseBlock</code>，来自 Anthropic SDK）：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>type: &#39;tool_use&#39;</code></td>
+<td>辨别式</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>工具调用 ID（与 tool_result 配对）</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>工具名称</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td>工具输入参数（JSON 对象）</td>
+</tr>
+</tbody></table></div><p><strong>ToolResultBlock</strong>（<code>ToolResultBlockParam</code>，来自 Anthropic SDK）：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>type: &#39;tool_result&#39;</code></td>
+<td>辨别式</td>
+</tr>
+<tr>
+<td><code>tool_use_id</code></td>
+<td>对应的 tool_use ID</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>结果内容（字符串或内容块数组）</td>
+</tr>
+<tr>
+<td><code>is_error</code></td>
+<td>是否是错误结果</td>
+</tr>
+</tbody></table></div><h4>ProgressMessage（type: &#39;progress&#39;）</h4>
 <div class="code-block"><pre>// 推断自 createProgressMessage 工厂函数
 type ProgressMessage&lt;P extends Progress = Progress&gt; = {
   type: 'progress'
@@ -246,9 +469,119 @@ type ProgressMessage&lt;P extends Progress = Progress&gt; = {
   data: P                  // 进度数据（ToolProgressData | HookProgress）
 }</pre></div><h4>SystemMessage（type: &#39;system&#39;）</h4>
 <p>有多个 <code>subtype</code> 子类型：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>所有 SystemMessage 共有字段：<code>type: &#39;system&#39;</code>、<code>subtype</code>、<code>uuid</code>、<code>timestamp</code>、<code>content</code>、<code>isMeta</code>、<code>level</code>（部分子类型）。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>subtype</th>
+<th>类型名</th>
+<th>用途</th>
+</tr>
+</thead><tbody><tr>
+<td><code>&#39;informational&#39;</code></td>
+<td><code>SystemInformationalMessage</code></td>
+<td>通用信息提示</td>
+</tr>
+<tr>
+<td><code>&#39;local_command&#39;</code></td>
+<td><code>SystemLocalCommandMessage</code></td>
+<td>本地命令输出</td>
+</tr>
+<tr>
+<td><code>&#39;api_error&#39;</code></td>
+<td><code>SystemAPIErrorMessage</code></td>
+<td>API 错误展示</td>
+</tr>
+<tr>
+<td><code>&#39;permission_retry&#39;</code></td>
+<td><code>SystemPermissionRetryMessage</code></td>
+<td>权限重试提示</td>
+</tr>
+<tr>
+<td><code>&#39;bridge_status&#39;</code></td>
+<td><code>SystemBridgeStatusMessage</code></td>
+<td>远程桥接状态</td>
+</tr>
+<tr>
+<td><code>&#39;scheduled_task_fire&#39;</code></td>
+<td><code>SystemScheduledTaskFireMessage</code></td>
+<td>定时任务触发</td>
+</tr>
+<tr>
+<td><code>&#39;stop_hook_summary&#39;</code></td>
+<td><code>SystemStopHookSummaryMessage</code></td>
+<td>Stop Hook 执行摘要</td>
+</tr>
+<tr>
+<td><code>&#39;compact_boundary&#39;</code></td>
+<td><code>SystemCompactBoundaryMessage</code></td>
+<td>对话压缩边界标记</td>
+</tr>
+<tr>
+<td><code>&#39;microcompact_boundary&#39;</code></td>
+<td><code>SystemMicrocompactBoundaryMessage</code></td>
+<td>微压缩边界标记</td>
+</tr>
+<tr>
+<td><code>&#39;api_metrics&#39;</code></td>
+<td><code>SystemApiMetricsMessage</code></td>
+<td>API 性能指标</td>
+</tr>
+<tr>
+<td><code>&#39;agents_killed&#39;</code></td>
+<td><code>SystemAgentsKilledMessage</code></td>
+<td>Agent 终止通知</td>
+</tr>
+<tr>
+<td><code>&#39;away_summary&#39;</code></td>
+<td><code>SystemAwaySummaryMessage</code></td>
+<td>离开摘要</td>
+</tr>
+<tr>
+<td><code>&#39;memory_saved&#39;</code></td>
+<td><code>SystemMemorySavedMessage</code></td>
+<td>记忆保存通知</td>
+</tr>
+<tr>
+<td><code>&#39;turn_duration&#39;</code></td>
+<td><code>SystemTurnDurationMessage</code></td>
+<td>轮次耗时统计</td>
+</tr>
+</tbody></table></div><p>所有 SystemMessage 共有字段：<code>type: &#39;system&#39;</code>、<code>subtype</code>、<code>uuid</code>、<code>timestamp</code>、<code>content</code>、<code>isMeta</code>、<code>level</code>（部分子类型）。</p>
 <h3>ProgressMessage vs AssistantMessage</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>ProgressMessage 何时产生</strong>：工具执行期间，通过 <code>onProgress?: ToolCallProgress&lt;P&gt;</code> 回调发射。
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>ProgressMessage</th>
+<th>AssistantMessage</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>发送方</strong></td>
+<td>工具执行过程（内部）</td>
+<td>Anthropic API 响应</td>
+</tr>
+<tr>
+<td><strong>是否进入 API</strong></td>
+<td>否，<code>normalizeMessagesForAPI</code> 过滤掉</td>
+<td>是，直接对应 API 的 assistant 角色消息</td>
+</tr>
+<tr>
+<td><strong>存储位置</strong></td>
+<td>与所属 tool_use 关联，通过 <code>toolUseID</code> 索引</td>
+<td>主消息列表</td>
+</tr>
+<tr>
+<td><strong>用途</strong></td>
+<td>工具执行实时进度展示（流式 UI）</td>
+<td>模型文本/工具调用结果永久记录</td>
+</tr>
+<tr>
+<td><strong>生命周期</strong></td>
+<td>工具运行期间，完成后可聚合</td>
+<td>持久化到 transcript</td>
+</tr>
+<tr>
+<td><strong>data 字段</strong></td>
+<td><code>ToolProgressData | HookProgress</code></td>
+<td>无，内容在 <code>message.content</code></td>
+</tr>
+</tbody></table></div><p><strong>ProgressMessage 何时产生</strong>：工具执行期间，通过 <code>onProgress?: ToolCallProgress&lt;P&gt;</code> 回调发射。
 典型场景：AgentTool 的子 Agent 进度、BashTool 的实时输出、MCP 工具的流式响应等。</p>
 <h3>SystemLocalCommandMessage 是什么？</h3>
 <div class="code-block"><pre>// 推断自 createCommandInputMessage 工厂函数
@@ -276,7 +609,39 @@ type SystemLocalCommandMessage = {
 
 // 内部模式（用户可寻址）= 外部模式 + 条件特性
 type InternalPermissionMode = ExternalPermissionMode | 'auto' | 'bubble'
-type PermissionMode = InternalPermissionMode</pre></div><div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><code>PERMISSION_MODES</code>（运行时用户可设置集合）= <code>INTERNAL_PERMISSION_MODES</code>，不含 <code>bubble</code>。</p>
+type PermissionMode = InternalPermissionMode</pre></div><div class="table-wrap"><table><thead><tr>
+<th>模式</th>
+<th>策略描述</th>
+</tr>
+</thead><tbody><tr>
+<td><code>default</code></td>
+<td>标准模式，每次危险操作询问用户</td>
+</tr>
+<tr>
+<td><code>acceptEdits</code></td>
+<td>自动接受文件编辑类操作，其他仍询问</td>
+</tr>
+<tr>
+<td><code>bypassPermissions</code></td>
+<td>绕过所有权限检查，直接执行（危险，需特权）</td>
+</tr>
+<tr>
+<td><code>dontAsk</code></td>
+<td>自动拒绝需要许可的操作，不询问用户</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td>计划模式，仅描述将要做什么，不实际执行</td>
+</tr>
+<tr>
+<td><code>auto</code></td>
+<td>自动模式，由 classifier 决策（feature flag 控制）</td>
+</tr>
+<tr>
+<td><code>bubble</code></td>
+<td>内部使用，权限决策向上冒泡</td>
+</tr>
+</tbody></table></div><p><code>PERMISSION_MODES</code>（运行时用户可设置集合）= <code>INTERNAL_PERMISSION_MODES</code>，不含 <code>bubble</code>。</p>
 <h3>PermissionResult 结构</h3>
 <div class="code-block"><pre>// src/types/permissions.ts
 
@@ -293,7 +658,32 @@ type PermissionDecision&lt;Input&gt; =
 type PermissionResult&lt;Input&gt; =
   | PermissionDecision&lt;Input&gt;
   | { behavior: 'passthrough'; message: string; ... }</pre></div><p>四种决策结果详解：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>PermissionDecisionReason</strong> 的 type 取值：
+<div class="table-wrap"><table><thead><tr>
+<th>行为</th>
+<th>类型名</th>
+<th>关键字段</th>
+</tr>
+</thead><tbody><tr>
+<td><code>allow</code></td>
+<td><code>PermissionAllowDecision</code></td>
+<td><code>updatedInput?</code>（修改后的输入）、<code>userModified?</code>、<code>acceptFeedback?</code>、<code>contentBlocks?</code></td>
+</tr>
+<tr>
+<td><code>ask</code></td>
+<td><code>PermissionAskDecision</code></td>
+<td><code>message</code>（提示用户的文本）、<code>suggestions?</code>（建议的规则更新）、<code>blockedPath?</code>、<code>pendingClassifierCheck?</code>（异步 classifier）</td>
+</tr>
+<tr>
+<td><code>deny</code></td>
+<td><code>PermissionDenyDecision</code></td>
+<td><code>message</code>（拒绝原因）、<code>decisionReason</code>（必填，<code>PermissionDecisionReason</code>）</td>
+</tr>
+<tr>
+<td><code>passthrough</code></td>
+<td>（inline）</td>
+<td><code>message</code>、<code>suggestions?</code>、<code>pendingClassifierCheck?</code>（透传给上层处理）</td>
+</tr>
+</tbody></table></div><p><strong>PermissionDecisionReason</strong> 的 type 取值：
 <code>rule</code>、<code>mode</code>、<code>subcommandResults</code>、<code>permissionPromptTool</code>、<code>hook</code>、<code>asyncAgent</code>、<code>sandboxOverride</code>、<code>classifier</code>、<code>workingDir</code>、<code>safetyCheck</code>、<code>other</code></p>
 <h3>AdditionalWorkingDirectory 是什么？</h3>
 <div class="code-block"><pre>// src/types/permissions.ts
@@ -533,7 +923,32 @@ type Tools = readonly Tool[]</pre></div><p><code>Tools</code> 是 <code>Tool[]</
 </ul>
 <p><strong>用途</strong>：注入用户轮次（user turn 开头），以 <code>&lt;system-reminder&gt;</code> 标签包裹。<code>claudeMd</code> 内容同时被缓存供 auto-mode classifier（yoloClassifier.ts）读取，避免循环依赖。</p>
 <p><strong>两者区别</strong>：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th></th>
+<th>getSystemContext</th>
+<th>getUserContext</th>
+</tr>
+</thead><tbody><tr>
+<td>注入位置</td>
+<td>system turn</td>
+<td>user turn（<system-reminder>标签）</td>
+</tr>
+<tr>
+<td>主要内容</td>
+<td>git 状态</td>
+<td>CLAUDE.md + 当前日期</td>
+</tr>
+<tr>
+<td>刷新时机</td>
+<td>setSystemPromptInjection 调用时</td>
+<td>同左</td>
+</tr>
+<tr>
+<td>分类器读取</td>
+<td>否</td>
+<td>claudeMd 被 yoloClassifier 读取</td>
+</tr>
+</tbody></table></div><hr>
 <h2>关键发现</h2>
 <h3>1. types/message.ts 和 types/tools.ts 是有意剥离的私有文件</h3>
 <p>这两个关键类型文件未包含在开源版本中，但被 180+ 个文件引用。推测原因：这些类型文件与 Anthropic 内部业务逻辑（消息结构演化、SDK 版本适配、内部扩展字段）紧密绑定，对外开源会带来接口承诺风险。开发者可通过 factory functions（<code>createUserMessage</code>、<code>createAssistantMessage</code> 等）理解实际结构。</p>

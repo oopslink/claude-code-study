@@ -38,8 +38,8 @@
 - [Task 8：插件与技能系统](phase-b/task-08-plugins-skills.md)
   — Plugin（声明式包）vs Skill（行为注入）、5 种来源加载、热重载（chokidar + 300ms 防抖）、SkillTool 执行流
 
-- [Task 9：上下文与内存管理](phase-b/task-09-memory.md)
-  — 三层内存架构（短期 JSONL / 中期 compact 摘要 / 长期 MEMORY.md）、autoCompact 阈值计算、extractMemories 后台子代理
+- [Task 9：上下文与记忆管理](phase-b/task-09-memory.md)
+  — 三层记忆架构（短期 JSONL / 中期 compact 摘要 / 长期 MEMORY.md）、autoCompact 阈值计算、extractMemories 后台子代理
 
 ---
 
@@ -67,5 +67,5 @@
 | 6 | 多层防御安全模型 | `src/utils/bash/ast.ts` |
 | 7 | 声明式权限规则引擎 | `src/utils/permissions/` |
 | 8 | 插件热加载与能力扩展 | `src/utils/plugins/pluginLoader.ts` |
-| 9 | 分层内存架构 | `src/memdir/memdir.ts` |
+| 9 | 分层记忆架构 | `src/memdir/memdir.ts` |
 | 10 | 上下文压缩触发与摘要注入 | `src/services/compact/autoCompact.ts` |

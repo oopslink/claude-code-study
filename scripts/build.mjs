@@ -29,7 +29,7 @@ const NAV = [
       { file: 'phase-b/task-06-multi-agent.md',     slug: 'task-06-multi-agent',     title: 'Task 6 · 多智能体' },
       { file: 'phase-b/task-07-security.md',        slug: 'task-07-security',        title: 'Task 7 · 安全沙箱' },
       { file: 'phase-b/task-08-plugins-skills.md',  slug: 'task-08-plugins-skills',  title: 'Task 8 · 插件技能' },
-      { file: 'phase-b/task-09-memory.md',          slug: 'task-09-memory',          title: 'Task 9 · 内存管理' },
+      { file: 'phase-b/task-09-memory.md',          slug: 'task-09-memory',          title: 'Task 9 · 上下文管理' },
     ],
   },
   {
@@ -70,7 +70,7 @@ for (const group of NAV) {
 
 const renderer = new marked.Renderer()
 
-renderer.link = function ({ href, title, text }) {
+renderer.link = function (href, title, text) {
   if (href && href.endsWith('.md')) {
     const key = href.replace(/^.*?((phase-[abc]|patterns)\/[^/]+\.md|[^/]+\.md)$/, '$1')
     const slug = pathToSlug[key] || pathToSlug[href.split('/').pop()]
@@ -79,19 +79,12 @@ renderer.link = function ({ href, title, text }) {
   return `<a href="${href}"${title ? ` title="${title}"` : ''}>${text}</a>`
 }
 
-renderer.code = function (token) {
-  const text = token.text ?? token ?? ''
-  return `<div class="code-block"><pre>${escapeHtml(String(text))}</pre></div>`
+renderer.code = function (code, lang) {
+  return `<div class="code-block"><pre>${escapeHtml(String(code ?? ''))}</pre></div>`
 }
 
-renderer.table = function (token) {
-  const header = Array.isArray(token.header) ? token.header : []
-  const rows   = Array.isArray(token.rows)   ? token.rows   : []
-  const thead = `<thead><tr>${header.map(c => `<th>${c.text ?? ''}</th>`).join('')}</tr></thead>`
-  const tbody = `<tbody>${rows.map(row =>
-    `<tr>${row.map(c => `<td>${c.text ?? ''}</td>`).join('')}</tr>`
-  ).join('')}</tbody>`
-  return `<div class="table-wrap"><table>${thead}${tbody}</table></div>`
+renderer.table = function (header, body) {
+  return `<div class="table-wrap"><table><thead>${header}</thead><tbody>${body}</tbody></table></div>`
 }
 
 marked.use({ renderer })
@@ -222,6 +215,10 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 `
 
 // ── HTML template ─────────────────────────────────────────────────────────────
@@ -243,6 +240,30 @@ function buildPage({ slug, title, promptPath, content, sidebarHtml, totalFiles }
 <style>${CSS}</style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">${ASCII}</pre>

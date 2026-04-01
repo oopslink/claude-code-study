@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -201,7 +229,84 @@ body{animation:flicker 8s infinite}
 <p>本目录收录 Claude Code 精读过程中归纳的 10 个核心设计模式，每个模式对应一个独立的卡片文件。</p>
 <hr>
 <h2>模式列表</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>模式名称</th>
+<th>来源子系统</th>
+<th>核心问题</th>
+<th>文件</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td><a href="#1-流式响应--工具调用循环">流式响应 + 工具调用循环</a></td>
+<td>Agent 核心循环</td>
+<td>如何在流式输出中处理工具调用并维持多轮对话？</td>
+<td><a href="pattern-01.html">01-streaming-tool-loop.md</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="#2-tool-接口统一抽象">Tool 接口统一抽象</a></td>
+<td>工具系统</td>
+<td>如何让能力差异极大的工具被模型以完全统一的方式调用？</td>
+<td><a href="pattern-02.html">02-tool-interface-abstraction.md</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="#3-进度上报与-ui-解耦">进度上报与 UI 解耦</a></td>
+<td>工具系统</td>
+<td>如何将工具执行的中间进度实时推送到 UI，且工具不依赖 UI 框架？</td>
+<td><a href="pattern-03.html">03-progress-reporting-decoupling.md</a></td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="#4-分层-agent-编排">分层 Agent 编排</a></td>
+<td>多智能体架构</td>
+<td>如何根据任务特征选择合适的 agent 执行模式？</td>
+<td><a href="pattern-04.html">04-layered-agent-orchestration.md</a></td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="#5-coordinator-worker-模式">Coordinator-Worker 模式</a></td>
+<td>多智能体架构</td>
+<td>如何将大任务分解给多个并行 agent 执行并聚合结果？</td>
+<td><a href="pattern-05.html">05-coordinator-worker-pattern.md</a></td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="#6-多层防御安全模型">多层防御安全模型</a></td>
+<td>安全与沙箱</td>
+<td>如何保证 LLM 生成的 bash 命令不破坏用户系统？</td>
+<td><a href="pattern-06.html">06-multi-layer-security-defense.md</a></td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="#7-声明式权限规则引擎">声明式权限规则引擎</a></td>
+<td>安全与沙箱</td>
+<td>如何让用户可配置地控制工具权限，而不需要改代码？</td>
+<td><a href="pattern-07.html">07-declarative-permission-rules.md</a></td>
+</tr>
+<tr>
+<td>8</td>
+<td><a href="#8-插件热加载与能力扩展">插件热加载与能力扩展</a></td>
+<td>插件与技能系统</td>
+<td>如何在不修改核心代码、不重启进程的情况下，让 agent 获得新能力？</td>
+<td><a href="pattern-08.html">08-plugin-hot-loading.md</a></td>
+</tr>
+<tr>
+<td>9</td>
+<td><a href="#9-分层记忆架构">分层记忆架构</a></td>
+<td>上下文与记忆管理</td>
+<td>如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？</td>
+<td><a href="pattern-09.html">09-layered-memory-architecture.md</a></td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="#10-上下文压缩触发与摘要注入">上下文压缩触发与摘要注入</a></td>
+<td>上下文与记忆管理</td>
+<td>Context window 有限，如何在长对话中不丢失重要信息？</td>
+<td><a href="pattern-10.html">10-context-compression.md</a></td>
+</tr>
+</tbody></table></div><hr>
 <h2>模式摘要</h2>
 <h3>1. 流式响应 + 工具调用循环</h3>
 <p><strong>问题摘要</strong>：如何在流式输出中处理工具调用并维持多轮对话？</p>
@@ -243,7 +348,7 @@ body{animation:flicker 8s infinite}
 <p><strong>核心思路</strong>：Plugin（纯 Markdown + JSON 包，无可执行代码）+ Skill（<code>getPromptForCommand()</code> 行为注入）双轨扩展。Plugin 启动时并行加载（<code>Promise.allSettled</code> 错误隔离），Skill 通过 chokidar 文件监听实现热重载（300ms 防抖）。</p>
 <p><strong>关键文件</strong>：<code>src/utils/plugins/pluginLoader.ts</code>，<code>src/tools/SkillTool/SkillTool.ts</code>，<code>src/utils/skills/skillChangeDetector.ts</code></p>
 <hr>
-<h3>9. 分层内存架构</h3>
+<h3>9. 分层记忆架构</h3>
 <p><strong>问题摘要</strong>：如何在对话轮次间、会话间保持连贯「记忆」，同时不让所有信息堆进 context window？</p>
 <p><strong>核心思路</strong>：三层分离——短期（JSONL append-only，parentUuid DAG 链）、中期（compact 摘要，LLM 生成 + boundary marker 切片）、长期（memory files，每条记忆独立文件 + MEMORY.md 索引）。Git root 作为记忆目录键保证 worktree 共享。</p>
 <p><strong>关键文件</strong>：<code>src/memdir/memdir.ts</code>，<code>src/utils/sessionStorage.ts</code>，<code>src/services/extractMemories/extractMemories.ts</code></p>

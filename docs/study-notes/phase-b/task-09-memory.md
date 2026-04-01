@@ -1,6 +1,6 @@
 ---
 ---
-# Task 09：上下文与内存管理精读
+# Task 09：上下文与记忆管理精读
 
 > 研究日期：2026-03-31
 > 覆盖文件：memdir/memdir.ts, memdir/memoryTypes.ts, memdir/paths.ts,
@@ -10,11 +10,11 @@
 
 ---
 
-## 三层内存架构全景
+## 三层记忆架构全景
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 长期内存（memory files / memdir）                                      │
+│ 长期记忆（memory files / memdir）                                      │
 │                                                                      │
 │ 路径：<memoryBase>/projects/<sanitized-git-root>/memory/             │
 │       其中 memoryBase 默认 ~/.claude，CCR 时由                        │
@@ -31,7 +31,7 @@
                     ↑ 提取自对话历史
 
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 中期内存（compact 摘要）                                               │
+│ 中期记忆（compact 摘要）                                               │
 │                                                                      │
 │ 存储：随会话历史一起持久化到 JSONL，作为 compact boundary 后的         │
 │       user message 重新加载到下次 API 请求                             │
@@ -45,7 +45,7 @@
                     ↑ 压缩自
 
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 短期内存（session messages / sessionStorage）                         │
+│ 短期记忆（session messages / sessionStorage）                         │
 │                                                                      │
 │ 路径：<projectsDir>/<sanitized-cwd>/<sessionId>.jsonl                │
 │       projectsDir = ~/.claude/projects/                              │
@@ -58,7 +58,7 @@
 
 ---
 
-## 一、长期内存（memdir / memory files）
+## 一、长期记忆（memdir / memory files）
 
 ### 1. 存储路径
 
@@ -150,7 +150,7 @@ type: {{user, feedback, project, reference}}
 
 ---
 
-## 二、中期内存（compact / 上下文压缩）
+## 二、中期记忆（compact / 上下文压缩）
 
 ### 4. 自动压缩触发条件
 
@@ -306,7 +306,7 @@ Your summary should include the following sections:
 
 ---
 
-## 三、短期内存（session messages / sessionStorage）
+## 三、短期记忆（session messages / sessionStorage）
 
 ### 9. 存储路径与格式
 
@@ -466,7 +466,7 @@ How to save memories:
 
 ---
 
-## 模式卡片 #9：分层内存架构
+## 模式卡片 #9：分层记忆架构
 
 **问题**：Agent 如何在对话轮次间、会话间保持连贯的「记忆」，同时不让所有信息都堆进 context window？
 

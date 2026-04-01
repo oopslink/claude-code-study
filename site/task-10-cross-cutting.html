@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="active">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -207,7 +235,43 @@ body{animation:flicker 8s infinite}
 <h2>一、错误处理模式</h2>
 <h3>错误分类</h3>
 <p><code>errors.ts</code> 通过 <code>createAssistantAPIErrorMessage({ error: &lt;type&gt; })</code> 中的 <code>error</code> 字段进行分类：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>注意</strong>：<code>error</code> 字段仅用于内部分类和分析（<code>classifyAPIError()</code> 对应 Datadog tag）。<code>content</code> 字段才是最终展示给用户的人类可读文本，且会根据 <code>isNonInteractiveSession()</code> 调整措辞（SDK 模式省略 <code>/esc esc</code> 等 TUI 操作提示）。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>错误类型</th>
+<th>典型错误（常量/触发条件）</th>
+<th>处理策略</th>
+<th>用户可见性</th>
+</tr>
+</thead><tbody><tr>
+<td><code>rate_limit</code></td>
+<td><code>REPEATED_529_ERROR_MESSAGE</code>、429（quota 耗尽）、<code>CUSTOM_OFF_SWITCH_MESSAGE</code>（Opus 容量关闭）</td>
+<td>展示等待时间/切换建议；<code>NO_RESPONSE_REQUESTED</code> 表示静默降级（Opus→Sonnet fallback）</td>
+<td>高；有专属 UI 展示限额信息</td>
+</tr>
+<tr>
+<td><code>invalid_request</code></td>
+<td><code>PROMPT_TOO_LONG_ERROR_MESSAGE</code>（400/413）、PDF 页数超限、image 尺寸超限、tool_use/tool_result 序列错误、无效模型名</td>
+<td>终止本次请求；reactive compact 使用 <code>errorDetails</code> 决定是否压缩重试</td>
+<td>高；含具体操作指引（/rewind、/model、pdftotext 等）</td>
+</tr>
+<tr>
+<td><code>authentication_failed</code></td>
+<td><code>INVALID_API_KEY_ERROR_MESSAGE</code>（x-api-key 错误）、<code>TOKEN_REVOKED_ERROR_MESSAGE</code>（403 OAuth revoked）、401/403 通用</td>
+<td>提示 <code>/login</code>；CCR 模式下展示&quot;可能是临时网络问题&quot;（不建议重新登录）</td>
+<td>高；强引导登录流程</td>
+</tr>
+<tr>
+<td><code>billing_error</code></td>
+<td><code>CREDIT_BALANCE_TOO_LOW_ERROR_MESSAGE</code>（余额不足）</td>
+<td>终止请求，引导充值</td>
+<td>高</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td><code>APIConnectionError</code>（非超时）、<code>APIConnectionTimeoutError</code>、通用 <code>Error</code></td>
+<td>展示原始错误消息</td>
+<td>中；显示 <code>API Error: &lt;message&gt;</code></td>
+</tr>
+</tbody></table></div><p><strong>注意</strong>：<code>error</code> 字段仅用于内部分类和分析（<code>classifyAPIError()</code> 对应 Datadog tag）。<code>content</code> 字段才是最终展示给用户的人类可读文本，且会根据 <code>isNonInteractiveSession()</code> 调整措辞（SDK 模式省略 <code>/esc esc</code> 等 TUI 操作提示）。</p>
 <h3>工具错误格式化</h3>
 <p><strong>给模型的格式</strong>（<code>toolExecution.ts</code> L1030-1036）：</p>
 <div class="code-block"><pre>tool_result block:
@@ -225,7 +289,67 @@ body{animation:flicker 8s infinite}
 </ul>
 <p><strong>核心差异</strong>：给模型的是纯文本 <code>content</code> 字段 + <code>is_error: true</code> 布尔标志（结构化），给用户的是 React 组件渲染（视觉化）。两者使用同一条 <code>tool_result</code> 消息对象，但消费方不同。</p>
 <h3>HTTP 状态码处理策略</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>重试决策层</strong>：<code>withRetry.ts</code> 负责底层重试（检查 <code>signal.aborted</code>，指数退避），<code>errors.ts</code> 负责将不可重试错误转换为 <code>AssistantMessage</code> 终止当前对话轮次，两层职责分离。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP 状态码</th>
+<th>触发场景</th>
+<th>是否重试</th>
+<th>处理路径</th>
+</tr>
+</thead><tbody><tr>
+<td>400</td>
+<td>请求格式错误（prompt 太长、PDF 无效、tool_use 序列问题、无效模型）</td>
+<td>否（直接失败）；但 prompt_too_long 会触发 reactive compact 后重试</td>
+<td><code>getAssistantMessageFromError()</code> 按子类型分别处理</td>
+</tr>
+<tr>
+<td>401</td>
+<td>认证失败（通用 401）</td>
+<td>否</td>
+<td><code>authentication_failed</code> 类型；CCR 模式提示重试</td>
+</tr>
+<tr>
+<td>403</td>
+<td>OAuth token 被撤销、OAuth 组织不允许、Bedrock 无模型权限</td>
+<td>否</td>
+<td><code>authentication_failed</code> 类型</td>
+</tr>
+<tr>
+<td>404</td>
+<td>模型不存在或无权限</td>
+<td>否</td>
+<td>引导 <code>/model</code> 切换</td>
+</tr>
+<tr>
+<td>413</td>
+<td>请求体超过 32MB 限制</td>
+<td>否</td>
+<td><code>invalid_request</code>；<code>getRequestTooLargeErrorMessage()</code></td>
+</tr>
+<tr>
+<td>429</td>
+<td>速率限制 / 配额耗尽</td>
+<td>由 <code>withRetry.ts</code> 决定；quota 耗尽不重试，临时容量 429 可重试</td>
+<td>解析 <code>anthropic-ratelimit-*</code> headers 判断类型</td>
+</tr>
+<tr>
+<td>529</td>
+<td>服务器过载（Anthropic 自定义）</td>
+<td>是（<code>withRetry.ts</code> 处理）；累计 N 次后抛 <code>REPEATED_529_ERROR_MESSAGE</code></td>
+<td>重试后若超限则展示 <code>repeated_529</code></td>
+</tr>
+<tr>
+<td>5xx</td>
+<td>服务器错误</td>
+<td>是（<code>withRetry.ts</code> 指数退避重试）</td>
+<td><code>classifyAPIError()</code> 返回 <code>server_error</code></td>
+</tr>
+<tr>
+<td>连接/超时</td>
+<td><code>APIConnectionError</code>、<code>APIConnectionTimeoutError</code></td>
+<td>是（<code>withRetry.ts</code> 处理）</td>
+<td>超时展示 <code>API_TIMEOUT_ERROR_MESSAGE</code></td>
+</tr>
+</tbody></table></div><p><strong>重试决策层</strong>：<code>withRetry.ts</code> 负责底层重试（检查 <code>signal.aborted</code>，指数退避），<code>errors.ts</code> 负责将不可重试错误转换为 <code>AssistantMessage</code> 终止当前对话轮次，两层职责分离。</p>
 <hr>
 <h2>二、权限模型一致性</h2>
 <h3>检查时机</h3>
@@ -257,18 +381,230 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'npm install' })
 
 permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1)"' })
   // =&gt; 'Bash(python -c "print\\(1\\)")'（括号被转义）</pre></div><p><strong>存储位置分层</strong>：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>key 的精度</strong>：<code>ruleContent</code> 是命令前缀匹配（而非完整命令哈希），设计为「允许整个命令族」而非「允许某次精确执行」。这是安全与易用性的权衡——过于精确会让用户频繁确认，过于宽松则存在权限蔓延风险。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>范围</th>
+<th>字段</th>
+<th>持久化位置</th>
+<th>生命周期</th>
+</tr>
+</thead><tbody><tr>
+<td>Session</td>
+<td><code>alwaysAllowRules.session[]</code></td>
+<td>仅内存（AppState）</td>
+<td>会话结束即清除</td>
+</tr>
+<tr>
+<td>Project</td>
+<td><code>alwaysAllowRules.project[]</code></td>
+<td><code>.claude/settings.json</code></td>
+<td>项目级永久</td>
+</tr>
+<tr>
+<td>User</td>
+<td><code>alwaysAllowRules.user[]</code></td>
+<td><code>~/.claude/settings.json</code></td>
+<td>用户级永久</td>
+</tr>
+<tr>
+<td>Policy</td>
+<td><code>alwaysAllowRules.policy[]</code></td>
+<td>企业策略文件</td>
+<td>只读，管理员控制</td>
+</tr>
+</tbody></table></div><p><strong>key 的精度</strong>：<code>ruleContent</code> 是命令前缀匹配（而非完整命令哈希），设计为「允许整个命令族」而非「允许某次精确执行」。这是安全与易用性的权衡——过于精确会让用户频繁确认，过于宽松则存在权限蔓延风险。</p>
 <hr>
 <h2>三、三对核心抽象的精确边界</h2>
 <h3>Tool vs Task</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>精确边界</strong>：<code>AgentTool</code> 是一个 Tool（被模型调用），它启动后会创建一个 <code>Task</code>（框架管理的长期任务）。工具调用是模型层的「函数调用协议」，任务是框架层的「并发执行单元」。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>Tool</th>
+<th>Task</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>接口核心字段</strong></td>
+<td><code>name</code>, <code>inputSchema</code>（Zod）, <code>call()</code>, <code>checkPermissions()</code>, <code>prompt()</code>, <code>mapToolResultToToolResultBlockParam()</code></td>
+<td><code>name</code>, <code>type</code>（TaskType enum）, <code>kill(taskId, setAppState)</code></td>
+</tr>
+<tr>
+<td><strong>调用方</strong></td>
+<td>模型（LLM 在 assistant message 中生成 <code>tool_use</code> 块）</td>
+<td>框架代码 / 父 agent（<code>AgentTool.call()</code> 或任务调度代码）</td>
+</tr>
+<tr>
+<td><strong>执行模型</strong></td>
+<td>同步或短暂异步，单次调用即完成</td>
+<td>长期运行，有完整状态机（<code>pending → running → completed/failed/killed</code>）</td>
+</tr>
+<tr>
+<td><strong>状态持久化</strong></td>
+<td>无持久状态；执行结果通过 <code>ToolResult&lt;T&gt;</code> 返回</td>
+<td>状态保存在 <code>AppState.tasks</code>（<code>TaskStateBase</code> 及子类），可 <code>--resume</code> 恢复</td>
+</tr>
+<tr>
+<td><strong>返回值类型</strong></td>
+<td><code>Promise&lt;ToolResult&lt;Output&gt;&gt;</code>（含 <code>data</code>, <code>newMessages?</code>, <code>contextModifier?</code>）</td>
+<td>无直接返回值；结果通过消息队列（<code>enqueuePendingNotification</code>）以 XML user 消息注入父对话</td>
+</tr>
+<tr>
+<td><strong>取消机制</strong></td>
+<td>无显式取消（通过 abort signal 传播）</td>
+<td>必须实现 <code>kill()</code>，可精确中止</td>
+</tr>
+<tr>
+<td><strong>生命周期管理</strong></td>
+<td>调用前/后有 hooks（<code>runPreToolUseHooks</code> / <code>runPostToolUseHooks</code>）</td>
+<td><code>evictAfter</code> 到期后由系统清理输出文件</td>
+</tr>
+<tr>
+<td><strong>UI 呈现</strong></td>
+<td>实现 <code>renderToolUseMessage()</code> 等一系列 render 方法</td>
+<td>在 TaskPanel 中展示状态、进度、输出流</td>
+</tr>
+<tr>
+<td><strong>典型实例</strong></td>
+<td>BashTool、FileReadTool、AgentTool</td>
+<td>LocalAgentTask、RemoteAgentTask、InProcessTeammateTask</td>
+</tr>
+</tbody></table></div><p><strong>精确边界</strong>：<code>AgentTool</code> 是一个 Tool（被模型调用），它启动后会创建一个 <code>Task</code>（框架管理的长期任务）。工具调用是模型层的「函数调用协议」，任务是框架层的「并发执行单元」。</p>
 <h3>Plugin vs Skill</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><h3>Memory vs Context</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>Plugin</th>
+<th>Skill</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>本质定义</strong></td>
+<td>文件系统包（目录 + 可选 plugin.json），声明式配置</td>
+<td>行为注入单元，命令式执行</td>
+</tr>
+<tr>
+<td><strong>内容格式</strong></td>
+<td>目录结构：<code>commands/</code>（Markdown）、<code>agents/</code>（Markdown）、<code>hooks/hooks.json</code>（JSON）、MCP bundle（<code>.mcpb</code>/<code>.dxt</code>）、<code>settings.json</code></td>
+<td><code>getPromptForCommand(args)</code> 函数返回 <code>ContentBlockParam[]</code>（<code>{type:&#39;text&#39;, text: string}[]</code>）；disk skill 用 YAML frontmatter + Markdown 正文（含 <code>$ARGUMENTS</code> 占位符）</td>
+</tr>
+<tr>
+<td><strong>注册机制</strong></td>
+<td>安装时由 <code>loadAllPlugins()</code> 扫描 <code>enabledPlugins</code> 配置；<code>createPluginFromPath()</code> 解析目录结构；结果 memoize 缓存</td>
+<td>三种来源：bundled（TypeScript 函数直接注册）、disk（<code>.claude/skills/</code> 目录，<code>loadSkillsDir()</code> 扫描）、MCP（从 MCP 服务器加载）</td>
+</tr>
+<tr>
+<td><strong>运行时行为</strong></td>
+<td>不主动运行；提供给系统使用的 commands、agents、hooks 定义；hooks 在工具调用时触发执行</td>
+<td>被 <code>SkillTool</code> 以 <code>tool_use</code> 方式调用；<code>getPromptForCommand()</code> 返回的文本以 <strong>user 消息</strong> 注入对话，驱动模型按指令行动</td>
+</tr>
+<tr>
+<td><strong>可执行代码</strong></td>
+<td>不能包含任意可执行 JS/TS；只能配置已有功能</td>
+<td>bundled skill 是 TypeScript 函数，可访问文件系统（如 <code>debug.ts</code> 读取 debug 日志）</td>
+</tr>
+<tr>
+<td><strong>包含关系</strong></td>
+<td>Plugin 的 <code>commands/</code> 目录内容可以作为 Skill 注册</td>
+<td>Skill 不依赖 Plugin 机制，可独立存在</td>
+</tr>
+<tr>
+<td><strong>失败隔离</strong></td>
+<td><code>Promise.allSettled</code>，单插件失败不影响系统；错误展示在 <code>/plugin</code> UI</td>
+<td>Skill 执行失败返回 tool error；通过 contextModifier 更新 <code>allowedTools</code> 时的错误会回滚</td>
+</tr>
+<tr>
+<td><strong>安全模型</strong></td>
+<td>路径遍历防护 + marketplace 名称保护 + 企业策略 allowlist/blocklist</td>
+<td>bundled skill 受 Claude Code 权限控制；disk skill 内容由用户自行编写，执行时受工具权限约束</td>
+</tr>
+</tbody></table></div><h3>Memory vs Context</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>Memory（内存文件，memdir）</th>
+<th>Context（会话上下文，sessionStorage + compact）</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>存储路径</strong></td>
+<td><code>~/.claude/projects/&lt;sanitized-git-root&gt;/memory/</code>（MEMORY.md + topic 文件）；CCR 时为 <code>CLAUDE_CODE_REMOTE_MEMORY_DIR</code></td>
+<td><code>~/.claude/projects/&lt;sanitized-cwd&gt;/&lt;sessionId&gt;.jsonl</code>（每行一个 Message）</td>
+</tr>
+<tr>
+<td><strong>数据格式</strong></td>
+<td>YAML frontmatter（name/description/type）+ Markdown 正文；MEMORY.md 为索引文件</td>
+<td>JSONL，每行一个 <code>Message</code> 对象（含 <code>parentUuid</code> 形成链式结构）</td>
+</tr>
+<tr>
+<td><strong>生命周期</strong></td>
+<td>跨会话持久；手动写入或 <code>extractMemories</code> 子代理异步提取；不自动过期</td>
+<td>会话内持久；可 <code>--resume</code> 恢复；通过 compact 压缩后旧消息被摘要替代</td>
+</tr>
+<tr>
+<td><strong>注入模型的方式</strong></td>
+<td><code>loadMemoryPrompt()</code> → <code>systemPromptSection(&#39;memory&#39;, ...)</code> 注入 system prompt；MEMORY.md 内容（≤200 行/25KB）通过 <code>claudemd.ts</code> 的 user context 部分注入</td>
+<td><code>getMessagesAfterCompactBoundary()</code> 从 compact boundary 后截取，构成 API 请求的 <code>messages</code> 数组；compact 摘要以 user message（<code>isCompactSummary=true</code>）形式开头</td>
+</tr>
+<tr>
+<td><strong>容量控制</strong></td>
+<td>MEMORY.md 超过 200 行/25KB 时截断并附加警告；完整 topic 文件按需由模型 <code>Read</code></td>
+<td>autoCompactThreshold = effectiveContextWindow - 13,000 token；超限触发 compact 压缩</td>
+</tr>
+<tr>
+<td><strong>写入路径</strong></td>
+<td>两条：① 模型在对话中显式 Write/Edit；② <code>extractMemories</code> 后台子代理每轮结束异步触发</td>
+<td>由 <code>recordTranscript()</code> 在每条 assistant/user 消息生成时追加写入 JSONL</td>
+</tr>
+<tr>
+<td><strong>跨会话语义</strong></td>
+<td>长期知识（用户偏好、项目决策、feedback 规则），跨会话稳定，需人工管理</td>
+<td>当前会话的完整对话历史，仅对当前会话有意义</td>
+</tr>
+<tr>
+<td><strong>典型内容</strong></td>
+<td>&quot;用户偏好使用 TypeScript strict 模式&quot;、&quot;项目正在迁移至新 API&quot;（不可从代码推导的信息）</td>
+<td>当前任务的工具调用链、文件内容、错误信息、对话轮次</td>
+</tr>
+</tbody></table></div><hr>
 <h2>四、系统级设计模式</h2>
 <h3>AsyncGenerator 的使用</h3>
 <p><strong>关键使用位置</strong>：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>为什么偏好 AsyncGenerator 而非 Promise</strong>：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>位置</th>
+<th>函数签名</th>
+<th>产出类型</th>
+<th>使用原因</th>
+</tr>
+</thead><tbody><tr>
+<td><code>query.ts</code></td>
+<td><code>async function* query(params)</code></td>
+<td><code>StreamEvent | Message | ToolUseSummaryMessage</code></td>
+<td>主循环，需要边产出边消费（流式渲染）</td>
+</tr>
+<tr>
+<td><code>services/api/claude.ts</code></td>
+<td><code>queryModelWithStreaming()</code> → <code>queryModel()</code></td>
+<td>SSE 流事件 → <code>Message</code></td>
+<td>对接 Anthropic SDK 的 SSE 流</td>
+</tr>
+<tr>
+<td><code>services/tools/toolExecution.ts</code></td>
+<td><code>async function* runToolUse(...)</code></td>
+<td><code>MessageUpdateLazy</code></td>
+<td>工具执行过程中持续产出进度更新</td>
+</tr>
+<tr>
+<td><code>services/tools/toolHooks.ts</code></td>
+<td><code>async function* runPreToolUseHooks(...)</code> 等</td>
+<td>Hook 执行结果</td>
+<td>hook 可能有多个，结果需要流式处理</td>
+</tr>
+<tr>
+<td><code>tools/AgentTool/runAgent.ts</code></td>
+<td>（内部使用 <code>query()</code>）</td>
+<td>复用 query 的产出</td>
+<td>子 agent 复用主循环</td>
+</tr>
+<tr>
+<td><code>services/tools/StreamingToolExecutor.ts</code></td>
+<td>管理流式工具执行状态</td>
+<td><code>tool_result</code> 块</td>
+<td>并行工具执行的进度汇聚</td>
+</tr>
+</tbody></table></div><p><strong>为什么偏好 AsyncGenerator 而非 Promise</strong>：</p>
 <ol>
 <li><p><strong>流式渲染需求</strong>：UI 需要在 API 响应完成前就开始渲染文字（token 级别的流式输出）。Promise 只能在完成后 resolve 一个值，无法支持增量渲染。</p>
 </li>
@@ -283,7 +619,27 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1
 </ol>
 <h3>回调注入模式</h3>
 <p><strong>三个核心回调</strong>及出现位置：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>统一解决的架构问题</strong>：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>回调</th>
+<th>注入位置</th>
+<th>统一解决的问题</th>
+</tr>
+</thead><tbody><tr>
+<td><code>canUseTool: CanUseToolFn</code></td>
+<td><code>QueryParams.canUseTool</code> → <code>toolExecution.runToolUse()</code> → <code>tool.call(canUseTool, ...)</code></td>
+<td>将「权限决策 UI」从工具实现解耦；工具不需要知道如何弹对话框，框架通过回调注入决策逻辑；测试时可注入 mock 实现</td>
+</tr>
+<tr>
+<td><code>setAppState: SetAppState</code></td>
+<td><code>QueryEngineConfig.setAppState</code> → <code>ToolUseContext.setAppState</code> → 工具内部</td>
+<td>工具可以更新全局 UI 状态（注册后台任务、更新权限规则），而不需要持有 React state 引用；子 agent 使用 no-op 版本实现隔离</td>
+</tr>
+<tr>
+<td><code>onProgress: ToolCallProgress&lt;P&gt;</code></td>
+<td><code>tool.call(args, ctx, canUseTool, parentMsg, onProgress?)</code></td>
+<td>工具向调用方上报中间进度（AgentTool 的子 agent 消息流、BashTool 的命令输出）；调用方决定如何处理进度（存储/渲染/转发）</td>
+</tr>
+</tbody></table></div><p><strong>统一解决的架构问题</strong>：</p>
 <p>这三个回调共同实现了<strong>依赖倒置</strong>原则——具体工具实现（低层模块）不依赖 UI 框架（高层模块），而是通过回调接口依赖。具体体现：</p>
 <ol>
 <li><strong>可测试性</strong>：测试中注入 mock 回调，无需启动 React 渲染树或真实 API</li>

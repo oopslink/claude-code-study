@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -212,7 +240,37 @@ body{animation:flicker 8s infinite}
   kill(taskId: string, setAppState: SetAppState): Promise&lt;void&gt;
 }</pre></div><p>它只做一件事：<strong>持有类型标识，并知道如何终止自身</strong>。注释说 spawn/render 曾经是多态调用但已移除（#22546），现在 <code>kill</code> 是唯一多态方法。</p>
 <p><strong>与 Tool 的核心区别：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>真正的持久状态保存在 <code>TaskStateBase</code> 以及各子类的 <code>*TaskState</code> 中。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>Tool</th>
+<th>Task</th>
+</tr>
+</thead><tbody><tr>
+<td>调用方</td>
+<td>模型（LLM 生成 tool_use 块）</td>
+<td>框架/父 agent（代码调度）</td>
+</tr>
+<tr>
+<td>执行模型</td>
+<td>同步或异步，单次调用</td>
+<td>异步、长期运行，有完整生命周期</td>
+</tr>
+<tr>
+<td>状态</td>
+<td>无持久状态</td>
+<td>在 AppState.tasks 中持有完整状态</td>
+</tr>
+<tr>
+<td>取消</td>
+<td>无需取消</td>
+<td>必须支持 kill</td>
+</tr>
+<tr>
+<td>上报</td>
+<td>返回 tool_result 给模型</td>
+<td>通过 enqueuePendingNotification 异步上报</td>
+</tr>
+</tbody></table></div><p>真正的持久状态保存在 <code>TaskStateBase</code> 以及各子类的 <code>*TaskState</code> 中。</p>
 <h3>1.2 Task 状态机</h3>
 <div class="code-block"><pre>pending → running → completed
                   → failed
@@ -234,7 +292,39 @@ body{animation:flicker 8s infinite}
   | 'in_process_teammate'// t 前缀
   | 'local_workflow'     // w 前缀
   | 'monitor_mcp'        // m 前缀
-  | 'dream'              // d 前缀</pre></div><div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+  | 'dream'              // d 前缀</pre></div><div class="table-wrap"><table><thead><tr>
+<th>类型</th>
+<th>典型使用场景</th>
+</tr>
+</thead><tbody><tr>
+<td><code>local_bash</code></td>
+<td>父 agent 调用 BashTool 执行的后台 shell 命令，需要独立进度跟踪</td>
+</tr>
+<tr>
+<td><code>local_agent</code></td>
+<td>AgentTool 启动的异步后台子 agent（coordinator 的 worker）</td>
+</tr>
+<tr>
+<td><code>remote_agent</code></td>
+<td>ultraplan / ultrareview / autofix-pr 等在云端 CCR 环境运行的远程 agent</td>
+</tr>
+<tr>
+<td><code>in_process_teammate</code></td>
+<td>Swarm 模式下在同进程内运行的 teammate，通过 AsyncLocalStorage 隔离</td>
+</tr>
+<tr>
+<td><code>local_workflow</code></td>
+<td>本地工作流编排（多步顺序任务的容器）</td>
+</tr>
+<tr>
+<td><code>monitor_mcp</code></td>
+<td>监控 MCP 服务器状态的长期轮询任务</td>
+</tr>
+<tr>
+<td><code>dream</code></td>
+<td>推测性预计算任务（后台猜测用户下一步输入）</td>
+</tr>
+</tbody></table></div><hr>
 <h2>二、LocalAgentTask 精读</h2>
 <h3>2.1 创建独立 QueryEngine 实例</h3>
 <p>LocalAgentTask 本身不直接创建 QueryEngine。它依赖 <code>runAgent()</code> 函数（<code>src/tools/AgentTool/runAgent.ts</code>），该函数调用 <code>createSubagentContext()</code> 创建隔离的 <code>ToolUseContext</code>，再调用 <code>query()</code> 运行 agent 循环。</p>
@@ -268,9 +358,103 @@ body{animation:flicker 8s infinite}
 <h3>2.3 SubagentContextOverrides 完整定义与设计动机</h3>
 <p><code>SubagentContextOverrides</code> 类型定义（<code>src/utils/forkedAgent.ts:260-304</code>）包含以下字段及其处理方式：</p>
 <p><strong>覆盖字段（override）—— 显式控制子 agent 的配置：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>共享开关字段（shareXxx flags）—— 显式决定是否共享父的回调：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>其他字段：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>克隆而非直接共享的关键原因：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>类型</th>
+<th>处理方式</th>
+<th>设计动机</th>
+</tr>
+</thead><tbody><tr>
+<td><code>options</code></td>
+<td><code>ToolUseContext[&#39;options&#39;]</code></td>
+<td>直接用 override 或继承父</td>
+<td>子 agent 可有不同的工具集/模型配置</td>
+</tr>
+<tr>
+<td><code>agentId</code></td>
+<td><code>AgentId</code></td>
+<td>override 或自动生成新 ID</td>
+<td>每个子 agent 需要独立的身份标识</td>
+</tr>
+<tr>
+<td><code>agentType</code></td>
+<td><code>string</code></td>
+<td>override 或不设置</td>
+<td>子 agent 可指定专用 agent 类型</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>Message[]</code></td>
+<td>override 或继承父</td>
+<td>子 agent 可从特定消息状态开始</td>
+</tr>
+<tr>
+<td><code>readFileState</code></td>
+<td><code>ToolUseContext[&#39;readFileState&#39;]</code></td>
+<td>override 或克隆父</td>
+<td>子 agent 读文件不污染父的缓存</td>
+</tr>
+<tr>
+<td><code>abortController</code></td>
+<td><code>AbortController</code></td>
+<td>override 或新建</td>
+<td>子 agent 有独立的取消信号树</td>
+</tr>
+<tr>
+<td><code>getAppState</code></td>
+<td><code>ToolUseContext[&#39;getAppState&#39;]</code></td>
+<td>override 或包装后设置权限提示</td>
+<td>后台子 agent 不弹权限 UI</td>
+</tr>
+<tr>
+<td><code>contentReplacementState</code></td>
+<td><code>ContentReplacementState</code></td>
+<td>override 或克隆父</td>
+<td>确保 prompt cache 稳定性</td>
+</tr>
+<tr>
+<td><code>criticalSystemReminder_EXPERIMENTAL</code></td>
+<td><code>string</code></td>
+<td>override 或不设置</td>
+<td>实验性：每轮注入关键提示</td>
+</tr>
+</tbody></table></div><p><strong>共享开关字段（shareXxx flags）—— 显式决定是否共享父的回调：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>默认值</th>
+<th>处理方式</th>
+<th>为什么需要克隆或隔离</th>
+</tr>
+</thead><tbody><tr>
+<td><code>shareSetAppState</code></td>
+<td><code>false</code></td>
+<td>如 true 则共享父的回调；否则 no-op</td>
+<td>后台子 agent（LocalAgentTask）不应该更新父的 UI 状态，防止竞态条件；交互式子 agent（InProcessTeammate）可选择共享</td>
+</tr>
+<tr>
+<td><code>shareSetResponseLength</code></td>
+<td><code>false</code></td>
+<td>如 true 则共享父的回调；否则 no-op</td>
+<td>后台子 agent 的响应长度不应该累积到父的指标中；只有交互式 subagent 才需要</td>
+</tr>
+<tr>
+<td><code>shareAbortController</code></td>
+<td><code>false</code></td>
+<td>如 true 则直接用父的 abortController；否则新建子控制器</td>
+<td>默认隔离允许「ESC 取消当次工作但保持 teammate 存活」；非交互式 subagent 无需此能力</td>
+</tr>
+</tbody></table></div><p><strong>其他字段：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>处理方式</th>
+<th>设计动机</th>
+</tr>
+</thead><tbody><tr>
+<td><code>requireCanUseTool</code></td>
+<td>透传给子 agent</td>
+<td>speculation（推测）等功能需要强制调用权限检查以支持文件路径重写</td>
+</tr>
+</tbody></table></div><p><strong>克隆而非直接共享的关键原因：</strong></p>
 <div class="code-block"><pre>共享（直接引用同一对象）的问题：
   1. 父子 agent 并发修改同一状态 → 竞态条件（例如 contentReplacementState 被同时修改）
   2. 子 agent 的缓存污染父的缓存 → 下次查询时获得意外的缓存数据
@@ -332,7 +516,42 @@ const ctx = createSubagentContext(parentContext, {
 <hr>
 <h2>三、RemoteAgentTask 精读</h2>
 <h3>3.1 与 LocalAgentTask 的本质区别</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>跨进程消息传递：</strong>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>LocalAgentTask</th>
+<th>RemoteAgentTask</th>
+</tr>
+</thead><tbody><tr>
+<td>执行位置</td>
+<td>本地 Node.js 进程内</td>
+<td>Anthropic 云端 CCR 环境</td>
+</tr>
+<tr>
+<td>通信方式</td>
+<td>进程内函数调用，<code>query()</code> 直接运行</td>
+<td>HTTP 轮询（<code>pollRemoteSessionEvents</code>）</td>
+</tr>
+<tr>
+<td>状态获取</td>
+<td>AppState 实时更新</td>
+<td>每秒拉取一次远程事件</td>
+</tr>
+<tr>
+<td>持久化</td>
+<td>不需要，进程生命周期内</td>
+<td>写入 session sidecar（<code>--resume</code> 时恢复）</td>
+</tr>
+<tr>
+<td>中断</td>
+<td><code>abortController.abort()</code></td>
+<td>外部终止（<code>TaskStopTool</code>），session 留活</td>
+</tr>
+<tr>
+<td>消息格式</td>
+<td>结构化 AgentToolResult + 通知 XML</td>
+<td><code>SDKMessage[]</code> 日志 + 解析标签</td>
+</tr>
+</tbody></table></div><p><strong>跨进程消息传递：</strong>
 本地客户端通过 <code>pollRemoteSessionEvents(sessionId, lastEventId)</code> 轮询 CCR API（间隔 1 秒），获取 <code>SDKMessage[]</code> 格式的增量事件。增量文本直接 <code>appendTaskOutput()</code> 写入磁盘，全量 log 累积在内存 <code>accumulatedLog</code> 中。</p>
 <h3>3.2 远程任务结果序列化格式</h3>
 <p>结果嵌入在 <code>SDKMessage[]</code> 的 <code>result</code> 类型消息中：</p>
@@ -348,7 +567,47 @@ const result = accumulatedLog.findLast(msg =&gt; msg.type === 'result')
 <hr>
 <h2>四、InProcessTeammateTask 精读</h2>
 <h3>4.1 与 LocalAgentTask 的区别</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>「进程内」的核心优势：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>维度</th>
+<th>LocalAgentTask</th>
+<th>InProcessTeammateTask</th>
+</tr>
+</thead><tbody><tr>
+<td>生命周期</td>
+<td>一次性：任务完成即终止</td>
+<td>持续运行：idle 后等待新任务</td>
+</tr>
+<tr>
+<td>身份</td>
+<td>无团队身份，匿名 agent</td>
+<td>有团队身份 <code>agentName@teamName</code>，颜色标识</td>
+</tr>
+<tr>
+<td>通信</td>
+<td>父通过 pending messages 队列注入</td>
+<td>文件系统 mailbox（同时也支持内存队列）</td>
+</tr>
+<tr>
+<td>权限申请</td>
+<td>不弹权限确认 UI</td>
+<td>通过 leader 的 ToolUseConfirmQueue 展示权限 UI，有 worker badge</td>
+</tr>
+<tr>
+<td>任务发现</td>
+<td>由父明确指定 prompt</td>
+<td>可主动从 team task list 认领任务</td>
+</tr>
+<tr>
+<td>消息上限</td>
+<td>messages 无上限（LocalAgentTaskState）</td>
+<td><code>TEAMMATE_MESSAGES_UI_CAP = 50</code> 条（内存优化）</td>
+</tr>
+<tr>
+<td>计划模式</td>
+<td>不支持</td>
+<td>支持 <code>planModeRequired</code>，等待 leader 审批</td>
+</tr>
+</tbody></table></div><p><strong>「进程内」的核心优势：</strong></p>
 <ol>
 <li><strong>零序列化开销</strong>：直接函数调用 <code>runAgent()</code>，不需要 IPC 或 HTTP</li>
 <li><strong>共享内存状态</strong>：通过 <code>AsyncLocalStorage</code> 隔离上下文同时共享 <code>AppState</code> Store</li>
@@ -415,7 +674,63 @@ while (!aborted &amp;&amp; !shouldExit):
 <p>Coordinator 的系统提示（<code>getCoordinatorSystemPrompt()</code>）明确其工作流：Research → Synthesis（coordinator 自己完成） → Implementation → Verification。Synthesis 阶段由 coordinator 亲自完成，禁止写「基于你的发现」这类懒性委派。</p>
 <hr>
 <h2>六、任务类型对比表</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>类型</th>
+<th>执行位置</th>
+<th>隔离程度</th>
+<th>适用场景</th>
+<th>选择标准</th>
+</tr>
+</thead><tbody><tr>
+<td><code>local_bash</code></td>
+<td>本地进程内（子进程）</td>
+<td>进程隔离</td>
+<td>单次 shell 命令，需要进度追踪</td>
+<td>无 LLM 推理，纯命令执行</td>
+</tr>
+<tr>
+<td><code>local_agent</code></td>
+<td>本地进程内（同线程）</td>
+<td>内存隔离（克隆上下文）</td>
+<td>coordinator 模式的 worker；需要 LLM 完成任务</td>
+<td>需要 LLM、可后台并行、结果异步通知</td>
+</tr>
+<tr>
+<td><code>remote_agent</code></td>
+<td>Anthropic 云端 CCR</td>
+<td>进程隔离（不同机器）</td>
+<td>ultraplan / ultrareview / autofix-pr</td>
+<td>任务耗时极长（&gt;30min）、需要专用云环境</td>
+</tr>
+<tr>
+<td><code>in_process_teammate</code></td>
+<td>本地进程内（同 JS 运行时）</td>
+<td>AsyncLocalStorage 上下文隔离</td>
+<td>Swarm 模式多 teammate 协作；长期持续运行的 agent</td>
+<td>需要团队协作、权限UI交互、任务列表、持续 idle</td>
+</tr>
+<tr>
+<td><code>local_workflow</code></td>
+<td>本地进程内</td>
+<td>依赖具体实现</td>
+<td>多步骤顺序工作流编排</td>
+<td>预定义流程，步骤之间有强依赖关系</td>
+</tr>
+<tr>
+<td><code>monitor_mcp</code></td>
+<td>本地进程内</td>
+<td>进程内隔离</td>
+<td>监控 MCP 服务器存活状态</td>
+<td>需要长期轮询外部服务</td>
+</tr>
+<tr>
+<td><code>dream</code></td>
+<td>本地进程内</td>
+<td>完全隔离（投机执行）</td>
+<td>后台预测下一步用户输入</td>
+<td>推测性，可随时丢弃结果</td>
+</tr>
+</tbody></table></div><hr>
 <h2>七、模式卡片</h2>
 <hr>
 <h3>模式卡片 #4：分层 Agent 编排</h3>
@@ -462,7 +777,37 @@ while (!aborted &amp;&amp; !shouldExit):
 <li>多 agent 团队、需要持续协作、需要权限 UI → <code>in_process_teammate</code></li>
 </ul>
 <p><strong>权衡：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th></th>
+<th>LocalAgent</th>
+<th>RemoteAgent</th>
+<th>InProcessTeammate</th>
+</tr>
+</thead><tbody><tr>
+<td>启动开销</td>
+<td>低（进程内）</td>
+<td>高（网络+云端启动）</td>
+<td>低（进程内）</td>
+</tr>
+<tr>
+<td>资源占用</td>
+<td>低（任务完成即释放）</td>
+<td>很低（本地只轮询）</td>
+<td>高（线程持续占用）</td>
+</tr>
+<tr>
+<td>可靠性</td>
+<td>依赖本地进程存活</td>
+<td>本地崩溃不影响（可 resume）</td>
+<td>依赖本地进程存活</td>
+</tr>
+<tr>
+<td>协作能力</td>
+<td>无（单次通知）</td>
+<td>无（异步通知）</td>
+<td>强（mailbox、任务列表、权限 UI）</td>
+</tr>
+</tbody></table></div><hr>
 <h3>模式卡片 #5：Coordinator-Worker 模式</h3>
 <p><strong>问题：</strong> 如何将大任务分解给多个并行 agent 执行，并聚合结果，同时避免 coordinator 自身执行具体操作带来的混乱？</p>
 <p><strong>方案（基于 coordinatorMode.ts 的具体实现）：</strong></p>
@@ -499,7 +844,27 @@ while (!aborted &amp;&amp; !shouldExit):
 <li>独立验证 → spawn fresh（验证者应有新鲜视角）</li>
 </ul>
 <p><strong>权衡：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>优势</th>
+<th>劣势</th>
+</tr>
+</thead><tbody><tr>
+<td>并行研究/实现大幅提速</td>
+<td>coordinator 轮次增加（每次等 worker 回报才能继续）</td>
+</tr>
+<tr>
+<td>清晰的任务归属（谁做了什么有 task-id 可追溯）</td>
+<td>worker 不能看到彼此的工作（只能通过 coordinator 中转）</td>
+</tr>
+<tr>
+<td>coordinator 上下文专注于高层决策</td>
+<td>长并行 session 会积累大量 task-notification 消息，增加 context 长度</td>
+</tr>
+<tr>
+<td>可以停止错误方向的 worker（TaskStopTool）</td>
+<td>worker 之间无法直接协调（无 peer-to-peer 通信）</td>
+</tr>
+</tbody></table></div><hr>
 <h2>八、关键洞察总结</h2>
 <ol>
 <li><p><strong>Task 是调度骨架，TaskState 是状态容器</strong>：<code>Task</code> 接口只有 <code>kill</code>，实际状态全在 <code>AppState.tasks[id]</code> 中的 <code>*TaskState</code> 对象里。</p>

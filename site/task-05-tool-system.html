@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -222,8 +250,98 @@ body{animation:flicker 8s infinite}
 }</pre></div><hr>
 <h3>Q2：Tool 接口需要实现的全部方法和属性</h3>
 <p><strong>必须实现（非 Defaultable）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>有默认值的方法（可不实现，<code>buildTool()</code> 填入安全默认值）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>可选扩展方法（按需实现）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>成员</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>name</code></td>
+<td><code>readonly string</code></td>
+<td>工具的唯一标识符</td>
+</tr>
+<tr>
+<td><code>inputSchema</code></td>
+<td><code>Input</code>（Zod schema）</td>
+<td>输入参数的校验与类型推断</td>
+</tr>
+<tr>
+<td><code>maxResultSizeChars</code></td>
+<td><code>number</code></td>
+<td>结果超出此大小则持久化到磁盘</td>
+</tr>
+<tr>
+<td><code>call(...)</code></td>
+<td><code>Promise&lt;ToolResult&lt;Output&gt;&gt;</code></td>
+<td>核心执行逻辑</td>
+</tr>
+<tr>
+<td><code>prompt(...)</code></td>
+<td><code>Promise&lt;string&gt;</code></td>
+<td>向模型描述工具用途的 system prompt 片段</td>
+</tr>
+<tr>
+<td><code>userFacingName(input)</code></td>
+<td><code>string</code></td>
+<td>UI 显示名称（可随 input 变化）</td>
+</tr>
+<tr>
+<td><code>toAutoClassifierInput(input)</code></td>
+<td><code>unknown</code></td>
+<td>提供给安全分类器的表示</td>
+</tr>
+<tr>
+<td><code>mapToolResultToToolResultBlockParam(...)</code></td>
+<td><code>ToolResultBlockParam</code></td>
+<td>将输出序列化为 API 格式</td>
+</tr>
+<tr>
+<td><code>renderToolUseMessage(...)</code></td>
+<td><code>React.ReactNode</code></td>
+<td>渲染工具调用的 UI</td>
+</tr>
+</tbody></table></div><p><strong>有默认值的方法（可不实现，<code>buildTool()</code> 填入安全默认值）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>方法</th>
+<th>默认值</th>
+<th>含义</th>
+</tr>
+</thead><tbody><tr>
+<td><code>isEnabled()</code></td>
+<td><code>true</code></td>
+<td>是否启用</td>
+</tr>
+<tr>
+<td><code>isConcurrencySafe(input)</code></td>
+<td><code>false</code></td>
+<td>假定不并发安全（保守）</td>
+</tr>
+<tr>
+<td><code>isReadOnly(input)</code></td>
+<td><code>false</code></td>
+<td>假定会写入（保守）</td>
+</tr>
+<tr>
+<td><code>isDestructive(input)</code></td>
+<td><code>false</code></td>
+<td>假定非破坏性</td>
+</tr>
+<tr>
+<td><code>checkPermissions(input, ctx)</code></td>
+<td><code>{behavior: &#39;allow&#39;}</code></td>
+<td>默认允许，交由通用权限系统</td>
+</tr>
+<tr>
+<td><code>toAutoClassifierInput(input)</code></td>
+<td><code>&#39;&#39;</code></td>
+<td>不参与分类器（安全相关工具须覆盖）</td>
+</tr>
+<tr>
+<td><code>userFacingName(input)</code></td>
+<td><code>tool.name</code></td>
+<td>等同于工具名</td>
+</tr>
+</tbody></table></div><p><strong>可选扩展方法（按需实现）：</strong></p>
 <ul>
 <li><code>description(input, opts)</code> — 异步描述字符串（用于权限提示文案）</li>
 <li><code>validateInput(input, ctx)</code> — 输入校验，在权限检查前运行</li>
@@ -259,7 +377,47 @@ body{animation:flicker 8s infinite}
 </ul>
 <hr>
 <h3>Q3：<code>ToolUseContext</code> 中最常用的 3-5 个字段</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>其中 <code>getAppState()</code> + <code>setAppState()</code> 是最核心的一对，几乎所有有状态操作都经过它们。<code>abortController</code> 是安全取消的统一入口。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>类型</th>
+<th>用途</th>
+</tr>
+</thead><tbody><tr>
+<td><code>options.tools</code></td>
+<td><code>Tools</code></td>
+<td>当前会话可用的完整工具列表（工具需要知道其他工具存在，如权限提示）</td>
+</tr>
+<tr>
+<td><code>getAppState()</code></td>
+<td><code>() =&gt; AppState</code></td>
+<td>读取全局应用状态，包括权限上下文、MCP 状态、任务列表</td>
+</tr>
+<tr>
+<td><code>setAppState(f)</code></td>
+<td><code>(prev: AppState) =&gt; AppState</code></td>
+<td>更新全局状态（如注册后台任务、更新权限规则）</td>
+</tr>
+<tr>
+<td><code>abortController</code></td>
+<td><code>AbortController</code></td>
+<td>取消信号，工具执行时通过此信号响应用户中断</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>Message[]</code></td>
+<td>当前会话的完整消息历史（fork subagent 用来继承父 agent 上下文）</td>
+</tr>
+<tr>
+<td><code>readFileState</code></td>
+<td><code>FileStateCache</code></td>
+<td>文件读取状态缓存（FileReadTool 用来去重重复读取）</td>
+</tr>
+<tr>
+<td><code>setToolJSX</code></td>
+<td><code>SetToolJSXFn | undefined</code></td>
+<td>向 UI 注入 React 节点（如 AgentTool 注入 BackgroundHint 进度提示）</td>
+</tr>
+</tbody></table></div><p>其中 <code>getAppState()</code> + <code>setAppState()</code> 是最核心的一对，几乎所有有状态操作都经过它们。<code>abortController</code> 是安全取消的统一入口。</p>
 <hr>
 <h3>Q4：<code>getTools()</code> vs <code>getAllBaseTools()</code> 的区别</h3>
 <p><strong><code>getAllBaseTools()</code>（信息来源，<code>tools.ts:193</code>）：</strong></p>
@@ -291,7 +449,42 @@ const REPLTool =
     ? require('./tools/REPLTool/REPLTool.js').REPLTool
     : null</pre></div><p>在 <code>getAllBaseTools()</code> 中：</p>
 <div class="code-block"><pre>...(process.env.USER_TYPE === 'ant' &amp;&amp; REPLTool ? [REPLTool] : []),</pre></div><p><strong>其他条件工具的模式：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>关键设计</strong>：用 <code>require()</code> 而非 <code>import</code> 配合三元运算符，实现 Bun 的 dead code elimination——对于 <code>feature(&#39;X&#39;) ? require(...) : null</code>，Bun 在编译时可以完全剔除未启用的代码路径，缩小最终二进制大小。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>模式</th>
+<th>示例</th>
+<th>机制</th>
+</tr>
+</thead><tbody><tr>
+<td><code>process.env.USER_TYPE === &#39;ant&#39;</code></td>
+<td>REPLTool, ConfigTool, TungstenTool</td>
+<td>仅 Anthropic 内部员工构建</td>
+</tr>
+<tr>
+<td><code>feature(&#39;PROACTIVE&#39;)</code></td>
+<td>SleepTool</td>
+<td>GrowthBook 功能标志（编译时 bun:bundle dead-code-elimination）</td>
+</tr>
+<tr>
+<td><code>feature(&#39;AGENT_TRIGGERS&#39;)</code></td>
+<td>CronCreateTool, CronDeleteTool</td>
+<td>代理触发器特性</td>
+</tr>
+<tr>
+<td><code>process.env.NODE_ENV === &#39;test&#39;</code></td>
+<td>TestingPermissionTool</td>
+<td>测试环境专用</td>
+</tr>
+<tr>
+<td><code>isToolSearchEnabledOptimistic()</code></td>
+<td>ToolSearchTool</td>
+<td>运行时功能检测</td>
+</tr>
+<tr>
+<td><code>isPowerShellToolEnabled()</code></td>
+<td>PowerShellTool</td>
+<td>平台能力检测（Windows）</td>
+</tr>
+</tbody></table></div><p><strong>关键设计</strong>：用 <code>require()</code> 而非 <code>import</code> 配合三元运算符，实现 Bun 的 dead code elimination——对于 <code>feature(&#39;X&#39;) ? require(...) : null</code>，Bun 在编译时可以完全剔除未启用的代码路径，缩小最终二进制大小。</p>
 <hr>
 <h3>Q6：FileReadTool 的 <code>call()</code> 核心逻辑和返回格式</h3>
 <p><strong>核心逻辑（<code>FileReadTool.ts:496-651</code>）：</strong></p>
@@ -374,8 +567,56 @@ const REPLTool =
 <h3>Q9：<code>forkSubagent.ts</code> 中，子 agent 继承 vs 隔离了什么</h3>
 <p><strong>Fork 子 agent 的核心设计思想</strong>：最大化 prompt cache 命中率，让所有并行 fork 共享相同的 API 请求前缀。</p>
 <p><strong>继承（子 agent 获得）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>隔离（子 agent 独立）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>Prompt Cache 最大化技巧</strong>（<code>forkSubagent.ts:107-168</code>）：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>继承内容</th>
+<th>实现机制</th>
+</tr>
+</thead><tbody><tr>
+<td>完整对话历史</td>
+<td><code>forkContextMessages: toolUseContext.messages</code>，传给 <code>runAgent</code></td>
+</tr>
+<tr>
+<td>父 agent 的 system prompt（字节级精确）</td>
+<td><code>toolUseContext.renderedSystemPrompt</code>（避免 GrowthBook 状态漂移重新计算）</td>
+</tr>
+<tr>
+<td>父 agent 的完整工具池</td>
+<td><code>availableTools: toolUseContext.options.tools</code>（<code>useExactTools: true</code>）</td>
+</tr>
+<tr>
+<td>父 agent 的 thinking 配置</td>
+<td>通过 <code>useExactTools</code> 从 runAgent 继承 <code>thinkingConfig</code></td>
+</tr>
+<tr>
+<td>父 assistant 消息的所有 tool_use 块</td>
+<td><code>buildForkedMessages()</code> 克隆整个 assistant message</td>
+</tr>
+</tbody></table></div><p><strong>隔离（子 agent 独立）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>隔离内容</th>
+<th>实现机制</th>
+</tr>
+</thead><tbody><tr>
+<td>子任务指令（directive）</td>
+<td>每个 fork 的 <code>prompt</code> 不同，作为最后一个 user message 块</td>
+</tr>
+<tr>
+<td>AbortController</td>
+<td>每个 fork 有独立的 abort 控制器</td>
+</tr>
+<tr>
+<td>工作目录（可选）</td>
+<td><code>isolation: &#39;worktree&#39;</code> 时创建独立 git worktree</td>
+</tr>
+<tr>
+<td>agentId</td>
+<td>每个 fork 生成唯一 ID</td>
+</tr>
+<tr>
+<td>进度跟踪</td>
+<td>独立的 <code>ProgressTracker</code></td>
+</tr>
+</tbody></table></div><p><strong>Prompt Cache 最大化技巧</strong>（<code>forkSubagent.ts:107-168</code>）：</p>
 <ul>
 <li>所有 fork 子 agent 共享同一 assistant message（包含所有 tool_use 块）</li>
 <li>所有 fork 的 tool_result placeholder 文本完全相同（<code>&#39;Fork started — processing in background&#39;</code>）</li>
@@ -469,7 +710,35 @@ hasPermissionsToUseTool() 返回 ask:
           - "Always allow" → allow + persistPermissionUpdates({destination: 'projectSettings', behavior: 'allow'})
           - "Deny"         → deny（不保存）
           - "Always deny"  → deny + persistPermissionUpdates({destination: 'projectSettings', behavior: 'deny'})</pre></div><p><strong>PermissionMode 对流程的影响：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>Mode</th>
+<th>行为</th>
+</tr>
+</thead><tbody><tr>
+<td><code>default</code></td>
+<td>正常流程，ask 时弹框</td>
+</tr>
+<tr>
+<td><code>acceptEdits</code></td>
+<td>只读工具自动允许，写操作仍 ask</td>
+</tr>
+<tr>
+<td><code>dontAsk</code></td>
+<td>所有 ask 自动转 deny</td>
+</tr>
+<tr>
+<td><code>bypassPermissions</code></td>
+<td>跳过大多数 ask（保留 safetyCheck）</td>
+</tr>
+<tr>
+<td><code>auto</code></td>
+<td>用 AI 分类器决策（不弹框）</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td>类似 default，但模型只能读不能写</td>
+</tr>
+</tbody></table></div><hr>
 <h3>Q12：「记住此选择」的数据存储位置</h3>
 <p><strong>存储结构：</strong> <code>ToolPermissionRulesBySource</code>（按来源分层）</p>
 <div class="code-block"><pre>type ToolPermissionRulesBySource = {
@@ -591,7 +860,27 @@ hasPermissionsToUseTool() 返回 ask:
 <li><strong>AgentTool 的具体实现</strong>：子 agent 每产出一条消息，<code>runAgent</code> generator yield 该消息，AgentTool 的 while 循环收到后调用 <code>onProgress({ data: { type: &#39;agent_progress&#39;, message } })</code>，UI 的 <code>renderToolUseProgressMessage</code> 将其渲染为可折叠的消息列表。</li>
 </ol>
 <p><strong>关键设计决策：onProgress 回调 vs 事件发射器 vs 响应式流？</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>onProgress 回调是最轻量的解耦方案：工具代码保持纯函数风格，框架通过闭包注入 UI 更新逻辑，双方通过 <code>ToolProgressData</code> 类型契约通信。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>方案</th>
+<th>分析</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>onProgress 回调（现方案）</strong></td>
+<td>函数注入，工具不持有框架引用；类型参数 <code>P</code> 限定进度类型；无需额外基础设施；与 async/await 自然组合</td>
+</tr>
+<tr>
+<td>EventEmitter</td>
+<td>工具需 <code>import EventEmitter</code>，或继承 EventEmitter 类；事件名是字符串（类型不安全）；需要手动清理监听器（内存泄漏风险）</td>
+</tr>
+<tr>
+<td>RxJS Observable</td>
+<td>强大但是重量级依赖；学习曲线陡；与现有 async/await 代码混用摩擦大</td>
+</tr>
+<tr>
+<td>AsyncGenerator（直接）</td>
+<td><code>runAgent</code> 内部用了 AsyncGenerator；但在工具接口层用 Generator 会破坏 <code>call()</code> 返回 <code>Promise&lt;ToolResult&gt;</code> 的统一签名</td>
+</tr>
+</tbody></table></div><p>onProgress 回调是最轻量的解耦方案：工具代码保持纯函数风格，框架通过闭包注入 UI 更新逻辑，双方通过 <code>ToolProgressData</code> 类型契约通信。</p>
 <p><strong>适用条件：</strong> 执行时间超过秒级的工具；有自然的中间状态（每条命令输出、每条子 agent 消息）；工具逻辑希望与 UI 框架完全解耦。</p>
 <p><strong>权衡：</strong></p>
 <ul>

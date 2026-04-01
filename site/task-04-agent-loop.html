@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -216,7 +244,77 @@ export async function* query(
   | ToolUseSummaryMessage,
   Terminal
 &gt;</pre></div><p><code>QueryParams</code>（L181-199）包含以下字段：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>返回类型是 <strong><code>AsyncGenerator</code></strong>（不是 Promise），通过 <code>yield*</code> 委托给内部的 <code>queryLoop()</code> 异步生成器，返回值（<code>Terminal</code>）表示退出原因。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>参数</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>messages</code></td>
+<td><code>Message[]</code></td>
+<td>当前对话历史</td>
+</tr>
+<tr>
+<td><code>systemPrompt</code></td>
+<td><code>SystemPrompt</code></td>
+<td>系统提示词</td>
+</tr>
+<tr>
+<td><code>userContext</code></td>
+<td><code>{[k: string]: string}</code></td>
+<td>用户侧上下文 KV</td>
+</tr>
+<tr>
+<td><code>systemContext</code></td>
+<td><code>{[k: string]: string}</code></td>
+<td>系统侧上下文 KV</td>
+</tr>
+<tr>
+<td><code>canUseTool</code></td>
+<td><code>CanUseToolFn</code></td>
+<td>工具权限检查函数</td>
+</tr>
+<tr>
+<td><code>toolUseContext</code></td>
+<td><code>ToolUseContext</code></td>
+<td>工具使用上下文（含 tools、model、options 等）</td>
+</tr>
+<tr>
+<td><code>fallbackModel?</code></td>
+<td><code>string</code></td>
+<td>模型降级目标</td>
+</tr>
+<tr>
+<td><code>querySource</code></td>
+<td><code>QuerySource</code></td>
+<td>请求来源标识（用于分析和缓存策略）</td>
+</tr>
+<tr>
+<td><code>maxOutputTokensOverride?</code></td>
+<td><code>number</code></td>
+<td>覆盖最大输出 token 数</td>
+</tr>
+<tr>
+<td><code>maxTurns?</code></td>
+<td><code>number</code></td>
+<td>最大轮次限制</td>
+</tr>
+<tr>
+<td><code>skipCacheWrite?</code></td>
+<td><code>boolean</code></td>
+<td>跳过缓存写入</td>
+</tr>
+<tr>
+<td><code>taskBudget?</code></td>
+<td><code>{ total: number }</code></td>
+<td>API 级 token 预算</td>
+</tr>
+<tr>
+<td><code>deps?</code></td>
+<td><code>QueryDeps</code></td>
+<td>可注入的依赖（测试用）</td>
+</tr>
+</tbody></table></div><p>返回类型是 <strong><code>AsyncGenerator</code></strong>（不是 Promise），通过 <code>yield*</code> 委托给内部的 <code>queryLoop()</code> 异步生成器，返回值（<code>Terminal</code>）表示退出原因。</p>
 <hr>
 <h3>Q2：tool use 循环的代码结构</h3>
 <p>核心在 <code>queryLoop()</code> 函数（L241 起），采用 <strong><code>while (true)</code> + 状态机迭代</strong> 模式，而非递归。每次迭代对应一个 API 请求轮次。</p>
@@ -273,7 +371,67 @@ while (true) {
 <hr>
 <h3>Q3：循环终止条件</h3>
 <p><code>queryLoop()</code> 通过 <code>return { reason: ... }</code> 退出 <code>while (true)</code> 循环，共有以下退出点：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>注意</strong>：<code>needsFollowUp === false</code> 本身不直接 return，要经过 stop hook 处理、token budget 检查后才真正 return <code>completed</code>。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>退出原因</th>
+<th>位置（行号）</th>
+<th>触发条件</th>
+</tr>
+</thead><tbody><tr>
+<td><code>blocking_limit</code></td>
+<td>L647</td>
+<td>上下文超过硬性限制且未开启自动压缩</td>
+</tr>
+<tr>
+<td><code>model_error</code></td>
+<td>L996</td>
+<td>API 调用抛出未处理异常</td>
+</tr>
+<tr>
+<td><code>aborted_streaming</code></td>
+<td>L1051</td>
+<td>流式接收时用户取消（abort 信号触发）</td>
+</tr>
+<tr>
+<td><code>image_error</code></td>
+<td>L1175</td>
+<td>图片/媒体大小错误且恢复失败</td>
+</tr>
+<tr>
+<td><code>prompt_too_long</code></td>
+<td>L1182</td>
+<td>413 错误且压缩恢复失败</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>L1264</td>
+<td>最后消息是 API 错误（限流、认证失败等）</td>
+</tr>
+<tr>
+<td><code>stop_hook_prevented</code></td>
+<td>L1279</td>
+<td>stop hook 主动阻止继续</td>
+</tr>
+<tr>
+<td><code>aborted_tools</code></td>
+<td>L1515</td>
+<td>工具执行过程中用户取消</td>
+</tr>
+<tr>
+<td><code>hook_stopped</code></td>
+<td>L1520</td>
+<td>hook 指示停止</td>
+</tr>
+<tr>
+<td><code>max_turns</code></td>
+<td>L1711</td>
+<td>达到 <code>maxTurns</code> 限制</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>L1357</td>
+<td>正常完成（<code>!needsFollowUp</code> 且 stop hooks 通过）</td>
+</tr>
+</tbody></table></div><p><strong>注意</strong>：<code>needsFollowUp === false</code> 本身不直接 return，要经过 stop hook 处理、token budget 检查后才真正 return <code>completed</code>。</p>
 <hr>
 <h3>Q4：流式响应在 query.ts 中的消费方式</h3>
 <p>使用 <strong><code>for await...of</code></strong> 迭代 <code>deps.callModel(...)</code> 返回的 AsyncGenerator（L659）：</p>
@@ -337,7 +495,62 @@ export class QueryEngine {
     this.totalUsage = EMPTY_USAGE
   }
 }</pre></div><p><code>QueryEngineConfig</code>（L130-173）注入的主要依赖：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>cwd</code></td>
+<td><code>string</code></td>
+<td>工作目录</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td><code>Tools</code></td>
+<td>工具列表</td>
+</tr>
+<tr>
+<td><code>commands</code></td>
+<td><code>Command[]</code></td>
+<td>斜杠命令列表</td>
+</tr>
+<tr>
+<td><code>mcpClients</code></td>
+<td><code>MCPServerConnection[]</code></td>
+<td>MCP 服务器连接</td>
+</tr>
+<tr>
+<td><code>agents</code></td>
+<td><code>AgentDefinition[]</code></td>
+<td>子 Agent 定义</td>
+</tr>
+<tr>
+<td><code>canUseTool</code></td>
+<td><code>CanUseToolFn</code></td>
+<td>权限检查函数</td>
+</tr>
+<tr>
+<td><code>getAppState / setAppState</code></td>
+<td>函数</td>
+<td>应用状态读写</td>
+</tr>
+<tr>
+<td><code>readFileCache</code></td>
+<td><code>FileStateCache</code></td>
+<td>文件状态缓存</td>
+</tr>
+<tr>
+<td><code>abortController?</code></td>
+<td><code>AbortController</code></td>
+<td>外部注入的取消控制器</td>
+</tr>
+<tr>
+<td><code>snipReplay?</code></td>
+<td>函数</td>
+<td>HISTORY_SNIP 功能的回调（feature-gated）</td>
+</tr>
+</tbody></table></div><hr>
 <h3>Q7：<code>submitMessage()</code> 内部调用 <code>query()</code> 的方式</h3>
 <div class="code-block"><pre>// QueryEngine.ts L675-686
 for await (const message of query({
@@ -408,7 +621,35 @@ const messages = [...this.mutableMessages]</pre></div></li>
 <h3>Q10：流式响应如何拼装成 AssistantMessage</h3>
 <p>在 <code>queryModel()</code> 函数中（<code>claude.ts L1017</code>），对 Anthropic SDK 返回的原始 SSE 流做 <code>for await (const part of stream)</code>（L1940），按事件类型处理：</p>
 <p><strong>状态机处理流程</strong>：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>关键设计</strong>：每个 <code>content_block</code> 对应一条独立的 <code>AssistantMessage</code>。<code>message_delta</code> 通过<strong>直接属性 mutation</strong>更新已 yield 消息的 <code>usage</code> 和 <code>stop_reason</code>（绕过对象替换，避免破坏 transcript 写队列持有的引用）。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>SSE 事件</th>
+<th>处理动作</th>
+</tr>
+</thead><tbody><tr>
+<td><code>message_start</code></td>
+<td>初始化 <code>partialMessage</code>，记录初始 <code>usage</code>（仅 input tokens）</td>
+</tr>
+<tr>
+<td><code>content_block_start</code></td>
+<td>在 <code>contentBlocks[index]</code> 初始化对应类型的 block（<code>text/tool_use/thinking/server_tool_use</code>），<code>input</code> 初始化为空字符串</td>
+</tr>
+<tr>
+<td><code>content_block_delta</code></td>
+<td>按 delta 类型追加内容：<code>text_delta</code> → <code>contentBlock.text +=</code>，<code>input_json_delta</code> → <code>contentBlock.input +=</code>（工具参数 JSON 流式拼接），<code>thinking_delta</code> → <code>contentBlock.thinking +=</code></td>
+</tr>
+<tr>
+<td><code>content_block_stop</code></td>
+<td><strong>组装 <code>AssistantMessage</code> 并 yield</strong>（L2192-2211）。此时 <code>usage.output_tokens</code> 还是 0</td>
+</tr>
+<tr>
+<td><code>message_delta</code></td>
+<td>写回最终 <code>usage</code>（含 output tokens）和 <code>stop_reason</code> 到已 yield 的 <code>lastMsg</code>（直接 mutation，L2244-2248），计算并上报成本（L2252-2256）</td>
+</tr>
+<tr>
+<td><code>message_stop</code></td>
+<td>无特殊处理</td>
+</tr>
+</tbody></table></div><p><strong>关键设计</strong>：每个 <code>content_block</code> 对应一条独立的 <code>AssistantMessage</code>。<code>message_delta</code> 通过<strong>直接属性 mutation</strong>更新已 yield 消息的 <code>usage</code> 和 <code>stop_reason</code>（绕过对象替换，避免破坏 transcript 写队列持有的引用）。</p>
 <p><strong>Chunk 类型总结</strong>：</p>
 <ul>
 <li><code>text</code>：普通文本回复</li>

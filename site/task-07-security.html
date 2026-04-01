@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -386,7 +414,52 @@ type ToolPermissionContext = {
 <hr>
 <p><strong>Q8：用户自定义规则存储在哪里？如何加载？</strong></p>
 <p><strong>存储位置</strong>（按来源 <code>PermissionRuleSource</code>）：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>加载方式</strong>：通过 <code>extractRules()</code> 从各来源的 settings JSON 中读取 <code>alwaysAllow</code>、<code>alwaysDeny</code>、<code>alwaysAsk</code> 字段，整合进 <code>ToolPermissionContext</code>，在每次权限检查时通过 <code>getRuleByContentsForTool()</code> 查询。</p>
+<div class="table-wrap"><table><thead><tr>
+<th>source</th>
+<th>物理路径</th>
+<th>作用域</th>
+</tr>
+</thead><tbody><tr>
+<td><code>userSettings</code></td>
+<td><code>~/.claude/settings.json</code></td>
+<td>全局，所有项目共享</td>
+</tr>
+<tr>
+<td><code>projectSettings</code></td>
+<td><code>&lt;cwd&gt;/.claude/settings.json</code></td>
+<td>项目级</td>
+</tr>
+<tr>
+<td><code>localSettings</code></td>
+<td><code>&lt;cwd&gt;/.claude/settings.local.json</code></td>
+<td>本地项目（不提交 git）</td>
+</tr>
+<tr>
+<td><code>policySettings</code></td>
+<td>管理员策略文件</td>
+<td>企业管控</td>
+</tr>
+<tr>
+<td><code>flagSettings</code></td>
+<td>CLI 启动参数 <code>--allow-bash</code> 等</td>
+<td>单次会话</td>
+</tr>
+<tr>
+<td><code>cliArg</code></td>
+<td>CLI 传入的规则</td>
+<td>单次会话</td>
+</tr>
+<tr>
+<td><code>session</code></td>
+<td>内存中（用户在当前对话确认&quot;不再询问&quot;）</td>
+<td>会话级临时</td>
+</tr>
+<tr>
+<td><code>command</code></td>
+<td>内置命令直接授权</td>
+<td>单次操作</td>
+</tr>
+</tbody></table></div><p><strong>加载方式</strong>：通过 <code>extractRules()</code> 从各来源的 settings JSON 中读取 <code>alwaysAllow</code>、<code>alwaysDeny</code>、<code>alwaysAsk</code> 字段，整合进 <code>ToolPermissionContext</code>，在每次权限检查时通过 <code>getRuleByContentsForTool()</code> 查询。</p>
 <hr>
 <h3>readOnlyValidation.ts（只读模式）</h3>
 <p><strong>Q9：只读模式的命令白名单有哪些？</strong></p>
@@ -403,7 +476,103 @@ type ToolPermissionContext = {
 <li><code>PYRIGHT_READ_ONLY_COMMANDS</code>：静态类型检查命令</li>
 </ul>
 <p><strong>常用只读命令列表（来自 COMMAND_ALLOWLIST）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>命令</th>
+<th>用途</th>
+</tr>
+</thead><tbody><tr>
+<td>xargs</td>
+<td>构建和执行命令，传递参数</td>
+</tr>
+<tr>
+<td>file</td>
+<td>确定文件类型</td>
+</tr>
+<tr>
+<td>sed</td>
+<td>流式文本编辑器（仅只读模式，无 <code>-i</code> 修改）</td>
+</tr>
+<tr>
+<td>sort</td>
+<td>行排序</td>
+</tr>
+<tr>
+<td>man</td>
+<td>查看手册页面</td>
+</tr>
+<tr>
+<td>help</td>
+<td>显示 shell 内置命令帮助</td>
+</tr>
+<tr>
+<td>netstat</td>
+<td>网络统计信息查询</td>
+</tr>
+<tr>
+<td>ps</td>
+<td>进程状态查询</td>
+</tr>
+<tr>
+<td>base64</td>
+<td>Base64 编码/解码</td>
+</tr>
+<tr>
+<td>grep</td>
+<td>文本搜索（管道配合）</td>
+</tr>
+<tr>
+<td>sha256sum</td>
+<td>SHA256 哈希校验</td>
+</tr>
+<tr>
+<td>sha1sum</td>
+<td>SHA1 哈希校验</td>
+</tr>
+<tr>
+<td>md5sum</td>
+<td>MD5 哈希校验</td>
+</tr>
+<tr>
+<td>tree</td>
+<td>目录树显示</td>
+</tr>
+<tr>
+<td>date</td>
+<td>日期时间信息</td>
+</tr>
+<tr>
+<td>hostname</td>
+<td>主机名查询</td>
+</tr>
+<tr>
+<td>info</td>
+<td>GNU 信息查看</td>
+</tr>
+<tr>
+<td>lsof</td>
+<td>开放文件列表</td>
+</tr>
+<tr>
+<td>pgrep</td>
+<td>进程名搜索</td>
+</tr>
+<tr>
+<td>tput</td>
+<td>终端能力查询</td>
+</tr>
+<tr>
+<td>ss</td>
+<td>套接字统计信息</td>
+</tr>
+<tr>
+<td>fd/fdfind</td>
+<td>文件查找工具（rg 替代品风格）</td>
+</tr>
+<tr>
+<td>aki</td>
+<td>内部工具</td>
+</tr>
+</tbody></table></div><hr>
 <p><strong>Q10：判断一个命令是否只读的算法步骤？</strong></p>
 <p>入口在 <code>BashTool.isReadOnly(input)</code> → <code>checkReadOnlyConstraints()</code>，算法如下：</p>
 <ol>
@@ -636,7 +805,72 @@ d. 未找到 → 非只读</p>
 </ul>
 <hr>
 <h2>四、关键文件索引</h2>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><hr>
+<div class="table-wrap"><table><thead><tr>
+<th>文件</th>
+<th>职责</th>
+<th>核心函数</th>
+</tr>
+</thead><tbody><tr>
+<td><code>/src/utils/bash/ast.ts</code></td>
+<td>AST 分析引擎，提取 argv[]</td>
+<td><code>parseForSecurity()</code>, <code>parseForSecurityFromAst()</code>, <code>walkProgram()</code></td>
+</tr>
+<tr>
+<td><code>/src/utils/bash/bashParser.ts</code></td>
+<td>pure-TS bash 解析器，生成 tree-sitter 兼容 AST</td>
+<td><code>parseSource()</code>, <code>TsNode</code></td>
+</tr>
+<tr>
+<td><code>/src/tools/BashTool/bashSecurity.ts</code></td>
+<td>正则+字符级安全检查（deprecated 主路径的 fallback）</td>
+<td><code>bashCommandIsSafe_DEPRECATED()</code></td>
+</tr>
+<tr>
+<td><code>/src/tools/BashTool/bashPermissions.ts</code></td>
+<td>权限规则引擎，决策树主控</td>
+<td><code>bashToolHasPermission()</code>, <code>checkCommandAndSuggestRules()</code>, <code>stripSafeWrappers()</code></td>
+</tr>
+<tr>
+<td><code>/src/tools/BashTool/readOnlyValidation.ts</code></td>
+<td>只读模式命令白名单验证</td>
+<td><code>checkReadOnlyConstraints()</code>, <code>COMMAND_ALLOWLIST</code></td>
+</tr>
+<tr>
+<td><code>/src/tools/BashTool/pathValidation.ts</code></td>
+<td>路径约束检查</td>
+<td><code>checkPathConstraints()</code></td>
+</tr>
+<tr>
+<td><code>/src/utils/permissions/filesystem.ts</code></td>
+<td>文件系统权限基础库</td>
+<td><code>pathInWorkingPath()</code>, <code>pathInAllowedWorkingPath()</code>, <code>checkPathSafetyForAutoEdit()</code></td>
+</tr>
+<tr>
+<td><code>/src/utils/permissions/PermissionResult.ts</code></td>
+<td>权限结果类型定义</td>
+<td><code>PermissionResult</code></td>
+</tr>
+<tr>
+<td><code>/src/types/permissions.ts</code></td>
+<td>核心权限类型（无循环依赖）</td>
+<td><code>PermissionRule</code>, <code>ToolPermissionContext</code>, <code>PermissionBehavior</code></td>
+</tr>
+<tr>
+<td><code>/src/utils/shell/readOnlyCommandValidation.ts</code></td>
+<td>只读命令及安全 flag 集合</td>
+<td><code>GIT_READ_ONLY_COMMANDS</code>, <code>EXTERNAL_READONLY_COMMANDS</code>, <code>validateFlags()</code></td>
+</tr>
+<tr>
+<td><code>/src/hooks/toolPermission/PermissionContext.ts</code></td>
+<td>权限提示 UI 与审批流</td>
+<td><code>handlePermissionRequest()</code></td>
+</tr>
+<tr>
+<td><code>/src/utils/sandbox/sandbox-adapter.ts</code></td>
+<td>OS 沙箱适配层</td>
+<td><code>SandboxManager</code></td>
+</tr>
+</tbody></table></div><hr>
 <h2>五、安全设计的深层 Insight</h2>
 <h3>1. FAIL-CLOSED 而非 FAIL-OPEN</h3>
 <p>整个安全系统的设计哲学是 fail-closed：当无法分析时，宁可提示用户，不默认允许。体现在：</p>

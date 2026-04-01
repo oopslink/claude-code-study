@@ -1,8 +1,8 @@
 ---
 ---
-# 模式卡片 #9：分层内存架构
+# 模式卡片 #9：分层记忆架构
 
-**来源子系统**：上下文与内存管理（Memory）
+**来源子系统**：上下文与记忆管理（Memory）
 **Claude Code 关键文件**：`src/memdir/memdir.ts`，`src/utils/sessionStorage.ts`，`src/services/extractMemories/extractMemories.ts`
 
 ---

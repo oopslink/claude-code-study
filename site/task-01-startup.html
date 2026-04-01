@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -230,7 +258,43 @@ const agentDefsPromise = worktreeEnabled ? null : getAgentDefinitionsWithOverrid
 <h3>问题 2：<code>profileCheckpoint</code> 出现了几次？它的作用是什么？</h3>
 <p>在 <code>main.tsx</code> 中共出现 <strong>42 次</strong>，setup.ts 中再出现 <strong>3 次</strong>（共 45 次）。</p>
 <p>主要出现位置（main.tsx）：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>作用（见 <code>src/utils/startupProfiler.ts</code>）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>出现位置</th>
+<th>checkpoint 名称</th>
+</tr>
+</thead><tbody><tr>
+<td>第 12 行</td>
+<td><code>main_tsx_entry</code></td>
+</tr>
+<tr>
+<td>第 209 行</td>
+<td><code>main_tsx_imports_loaded</code></td>
+</tr>
+<tr>
+<td>第 503/515 行</td>
+<td><code>eagerLoadSettings_start/end</code></td>
+</tr>
+<tr>
+<td>第 586/607/849/853/855 行</td>
+<td><code>main_*</code> 系列</td>
+</tr>
+<tr>
+<td>第 885/903 行</td>
+<td><code>run_*</code> 系列</td>
+</tr>
+<tr>
+<td>第 908-966 行</td>
+<td><code>preAction_*</code> 系列（共 7 个）</td>
+</tr>
+<tr>
+<td>第 1007/1862/1878/1904/1936/2031 行</td>
+<td><code>action_*</code> 系列</td>
+</tr>
+<tr>
+<td>第 2402/2560/2728/2824/2828 行</td>
+<td>MCP/plugin 阶段</td>
+</tr>
+</tbody></table></div><p><strong>作用（见 <code>src/utils/startupProfiler.ts</code>）：</strong></p>
 <ol>
 <li><strong>性能监控</strong>：使用 <code>performance.mark()</code> 记录各阶段时间戳，计算相邻 checkpoint 之间的耗时。</li>
 <li><strong>分级输出</strong>：<ul>
@@ -296,7 +360,61 @@ const coordinatorModeModule = feature('COORDINATOR_MODE')
 <hr>
 <h2>运行模式</h2>
 <h3>问题 6：系统有哪几种运行模式？</h3>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong>运行模式判定逻辑（main.tsx 第 800-803 行）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>模式</th>
+<th>触发条件（CLI 参数 / 环境变量）</th>
+<th>入口函数</th>
+<th>所在位置</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>Interactive（REPL）模式</strong></td>
+<td>默认（无 <code>-p</code>，stdout 是 TTY）</td>
+<td><code>launchRepl()</code> → 渲染 <code>&lt;App&gt;&lt;REPL/&gt;&lt;/App&gt;</code></td>
+<td>main.tsx 约第 3134、3176、3242、3338、3487、3733、3798 行（多处调用，对应不同的 resume/SSH/assistant 路径）</td>
+</tr>
+<tr>
+<td><strong>Headless（--print / -p）模式</strong></td>
+<td><code>-p</code> 或 <code>--print</code>，或 <code>--sdk-url</code>，或 <code>!process.stdout.isTTY</code></td>
+<td><code>runHeadless()</code> from <code>src/cli/print.js</code></td>
+<td>main.tsx 第 2826-2829 行</td>
+</tr>
+<tr>
+<td><strong>SDK 模式</strong></td>
+<td><code>CLAUDE_CODE_ENTRYPOINT=sdk-ts/sdk-py/sdk-cli</code>，或通过 <code>--sdk-url</code> 传入远程 SDK URL</td>
+<td><code>runHeadless()</code> + <code>stream-json</code> 格式（自动设置）</td>
+<td>main.tsx 第 1236-1252 行设置格式，然后走 headless 路径</td>
+</tr>
+<tr>
+<td><strong>Bridge（remote-control）模式</strong></td>
+<td><code>claude remote-control</code> 子命令（或 <code>--rc</code>），或 <code>CLAUDE_CODE_ENVIRONMENT_KIND=bridge</code></td>
+<td><code>bridgeMain()</code> from <code>src/bridge/bridgeMain.js</code></td>
+<td>main.tsx 第 4328-4331 行（commander action），以及 cli.tsx 快速路径</td>
+</tr>
+<tr>
+<td><strong>MCP server 模式</strong></td>
+<td><code>claude mcp serve</code></td>
+<td>MCP 服务注册 handler</td>
+<td>main.tsx 中 <code>initializeEntrypoint</code> 第 527 行设置 <code>CLAUDE_CODE_ENTRYPOINT=mcp</code></td>
+</tr>
+<tr>
+<td><strong>Init-only 模式</strong></td>
+<td><code>--init-only</code></td>
+<td>执行 Setup 和 SessionStart:startup hooks 后退出</td>
+<td>main.tsx 第 801 行检测，作为非交互模式处理</td>
+</tr>
+<tr>
+<td><strong>SSH Remote 模式</strong></td>
+<td><code>claude ssh &lt;host&gt;</code></td>
+<td>交互式 REPL，但底层连接是 SSH 会话</td>
+<td>main.tsx 第 706-794 行解析 SSH 参数，约第 3487 行处理 SSH 的 <code>launchRepl</code> 调用</td>
+</tr>
+<tr>
+<td><strong>Assistant（KAIROS）模式</strong></td>
+<td><code>claude assistant [sessionId]</code>，或 settings 中 <code>assistant: true</code> + GrowthBook gate</td>
+<td>交互式 REPL + bridge session attach</td>
+<td>main.tsx 第 685-698 行解析 assistant 参数，第 1048-1088 行初始化</td>
+</tr>
+</tbody></table></div><p><strong>运行模式判定逻辑（main.tsx 第 800-803 行）：</strong></p>
 <div class="code-block"><pre>const hasPrintFlag = cliArgs.includes('-p') || cliArgs.includes('--print')
 const hasInitOnlyFlag = cliArgs.includes('--init-only')
 const hasSdkUrl = cliArgs.some(arg =&gt; arg.startsWith('--sdk-url'))
@@ -305,7 +423,67 @@ const isNonInteractive = hasPrintFlag || hasInitOnlyFlag || hasSdkUrl || !proces
 <h2>初始化流程</h2>
 <h3>问题 7：<code>src/setup.ts</code> 设置了哪些全局状态？</h3>
 <p><code>setup()</code> 函数（setup.ts）设置的全局状态：</p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p>此外，<code>src/main.tsx</code> 的 action handler 在调用 <code>setup()</code> 前/后还设置：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>全局状态</th>
+<th>设置方式</th>
+<th>位置</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>cwd（当前工作目录）</strong></td>
+<td><code>setCwd(cwd)</code>（来自 <code>src/utils/Shell.js</code>）</td>
+<td>setup.ts 第 161 行；worktree 模式下会再次更新（第 272 行）</td>
+</tr>
+<tr>
+<td><strong>originalCwd</strong></td>
+<td><code>setOriginalCwd(getCwd())</code></td>
+<td>setup.ts 第 273 行（仅 worktree 模式）</td>
+</tr>
+<tr>
+<td><strong>projectRoot</strong></td>
+<td><code>setProjectRoot(getCwd())</code></td>
+<td>setup.ts 第 277 行（仅 worktree 模式）</td>
+</tr>
+<tr>
+<td><strong>session ID</strong></td>
+<td><code>switchSession(asSessionId(customSessionId))</code></td>
+<td>setup.ts 第 83 行（当 customSessionId 提供时）</td>
+</tr>
+<tr>
+<td><strong>UDS messaging socket</strong></td>
+<td><code>startUdsMessaging(socketPath)</code></td>
+<td>setup.ts 第 97-100 行（feature(&#39;UDS_INBOX&#39;) 时）</td>
+</tr>
+<tr>
+<td><strong>hooks 配置快照</strong></td>
+<td><code>captureHooksConfigSnapshot()</code></td>
+<td>setup.ts 第 166 行</td>
+</tr>
+<tr>
+<td><strong>fileChanged watcher</strong></td>
+<td><code>initializeFileChangedWatcher(cwd)</code></td>
+<td>setup.ts 第 172 行</td>
+</tr>
+<tr>
+<td><strong>session memory</strong></td>
+<td><code>initSessionMemory()</code></td>
+<td>setup.ts 第 294 行（非 bare 模式）</td>
+</tr>
+<tr>
+<td><strong>context collapse</strong></td>
+<td><code>initContextCollapse()</code></td>
+<td>setup.ts 第 298 行（feature(&#39;CONTEXT_COLLAPSE&#39;) 时）</td>
+</tr>
+<tr>
+<td><strong>analytics sinks</strong></td>
+<td><code>initSinks()</code></td>
+<td>setup.ts 第 371 行</td>
+</tr>
+<tr>
+<td><strong>api key（预取）</strong></td>
+<td><code>prefetchApiKeyFromApiKeyHelperIfSafe()</code></td>
+<td>setup.ts 第 380 行</td>
+</tr>
+</tbody></table></div><p>此外，<code>src/main.tsx</code> 的 action handler 在调用 <code>setup()</code> 前/后还设置：</p>
 <ul>
 <li><code>setIsInteractive(isInteractive)</code> 第 812 行</li>
 <li><code>setClientType(clientType)</code> 第 834 行</li>
@@ -316,7 +494,37 @@ const isNonInteractive = hasPrintFlag || hasInitOnlyFlag || hasSdkUrl || !proces
 <hr>
 <h3>问题 8：配置文件从哪里加载？查找顺序是什么？</h3>
 <p><strong>配置来源（<code>src/utils/settings/constants.ts</code> 第 7-22 行，后定义的优先级更高）：</strong></p>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div><p><strong><code>policySettings</code> 的内部优先级（settings.ts 第 322-395 行，同样后者覆盖前者）：</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>优先级</th>
+<th>来源名称</th>
+<th>文件路径</th>
+</tr>
+</thead><tbody><tr>
+<td>1（最低）</td>
+<td><code>userSettings</code></td>
+<td><code>~/.claude/settings.json</code>（全局用户配置）</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>projectSettings</code></td>
+<td><code>&lt;project&gt;/.claude/settings.json</code>（项目共享配置，可提交）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>localSettings</code></td>
+<td><code>&lt;project&gt;/.claude/settings.local.json</code>（项目本地配置，gitignored）</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>flagSettings</code></td>
+<td><code>--settings &lt;file-or-json&gt;</code> CLI 参数指定的文件或内联 JSON</td>
+</tr>
+<tr>
+<td>5（最高）</td>
+<td><code>policySettings</code></td>
+<td>企业管控设置，来源有优先级子序列（见下方）</td>
+</tr>
+</tbody></table></div><p><strong><code>policySettings</code> 的内部优先级（settings.ts 第 322-395 行，同样后者覆盖前者）：</strong></p>
 <ol>
 <li>文件：<code>&lt;managed-dir&gt;/managed-settings.json</code> + <code>managed-settings.d/*.json</code>（需要 admin 权限写入）</li>
 <li>注册表/plist：macOS plist 或 Windows HKLM 注册表（MDM 管控）</li>

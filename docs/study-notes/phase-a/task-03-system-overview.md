@@ -130,11 +130,11 @@ src/tools/SkillTool/
 
 ---
 
-### 子系统 5：上下文与内存管理
+### 子系统 5：上下文与记忆管理
 
 **memdir.ts 管理的内存类型**：
 
-`src/memdir/memdir.ts` 管理的是**持久化文件内存**（磁盘上的 `MEMORY.md`）：
+`src/memdir/memdir.ts` 管理的是**持久化文件记忆**（磁盘上的 `MEMORY.md`）：
 - 入口文件名：`MEMORY.md`（常量 `ENTRYPOINT_NAME`）
 - 最大行数限制：200 行（`MAX_ENTRYPOINT_LINES`）
 - 最大字节限制：25,000 字节（`MAX_ENTRYPOINT_BYTES`）
@@ -260,7 +260,7 @@ src/utils/permissions/
 ```
 [子系统 1：Agent 核心循环]
   ├── 直接依赖 → [子系统 2：工具系统]（执行 tool_use 块）
-  ├── 直接依赖 → [子系统 5：上下文/内存管理]（注入 memdir、触发 autoCompact）
+  ├── 直接依赖 → [子系统 5：上下文/记忆管理]（注入 memdir、触发 autoCompact）
   ├── 直接依赖 → [子系统 6：安全/沙箱]（通过 canUseTool 检查权限）
   ├── 直接依赖 → [子系统 3：多智能体]（AgentTool 产生子任务）
   ├── 提供给 → CLI 入口（query() 函数）/ SDK 入口（QueryEngine.submitMessage()）
@@ -284,7 +284,7 @@ src/utils/permissions/
   ├── 提供给 → [子系统 1：Agent 核心循环]（QueryEngine 预加载插件缓存）
   └── 数据流：Plugin 安装/配置 → Skill 目录加载 → SkillTool 暴露给 LLM
 
-[子系统 5：上下文与内存管理]
+[子系统 5：上下文与记忆管理]
   ├── 直接依赖 → [子系统 1：Agent 核心循环]（memdir 注入系统提示，compact 裁剪消息历史）
   ├── 提供给 → [子系统 1：Agent 核心循环]（内存提示内容、压缩后消息列表）
   └── 数据流：MEMORY.md → loadMemoryPrompt() → SystemPrompt 注入
@@ -303,7 +303,7 @@ src/utils/permissions/
 
 **核心枢纽（被多个系统依赖）**：
 
-1. **子系统 1：Agent 核心循环** — 最核心的枢纽。所有其他子系统最终都服务于它：工具系统提供执行能力，内存管理提供上下文，安全沙箱提供护栏，多智能体在其内部嵌套运行，插件/技能通过 SkillTool 接入。`query()` 是整个系统的生命线。
+1. **子系统 1：Agent 核心循环** — 最核心的枢纽。所有其他子系统最终都服务于它：工具系统提供执行能力，记忆管理提供上下文，安全沙箱提供护栏，多智能体在其内部嵌套运行，插件/技能通过 SkillTool 接入。`query()` 是整个系统的生命线。
 
 2. **子系统 2：工具系统** — 第二核心枢纽。作为 Agent 能力的载体，连接安全层（BashTool）、技能层（SkillTool）和多智能体层（AgentTool）。`getTools()` 是工具注册的单一真相来源。
 
@@ -311,7 +311,7 @@ src/utils/permissions/
 
 3. **子系统 3：多智能体** — 既依赖核心循环（子任务内部运行 query()），也被核心循环依赖（AgentTool 触发子任务）。形成递归结构。
 
-4. **子系统 5：上下文与内存管理** — 为核心循环提供服务，autoCompact 的触发点在 query.ts 内部，形成单向依赖。
+4. **子系统 5：上下文与记忆管理** — 为核心循环提供服务，autoCompact 的触发点在 query.ts 内部，形成单向依赖。
 
 **叶子节点（只提供服务，不依赖其他子系统）**：
 

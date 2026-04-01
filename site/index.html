@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -206,54 +234,109 @@ body{animation:flicker 8s infinite}
 <hr>
 <h2>Phase A：建立心智模型</h2>
 <ul>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-01-startup.html">Task 1：启动流程与运行模式</a>
 — 并行启动优化、Feature Flags（COORDINATOR_MODE / KAIROS）、8 种运行模式、setup.ts 全局状态</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-02-data-structures.html">Task 2：核心数据结构</a>
 — Message 类型 Union、PermissionMode、Tool 接口（~70 字段）、ToolUseContext、权限决策四元组</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-03-system-overview.html">Task 3：六大子系统速览与边界图</a>
 — 子系统一览、初版系统边界图、核心枢纽与叶子节点分析</p>
 </li>
 </ul>
 <hr>
 <h2>Phase B：核心子系统深潜</h2>
 <ul>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-04-agent-loop.html">Task 4：Agent 核心循环</a>
 — <code>query()</code> AsyncGenerator、<code>while(true)</code> 状态机、11 个退出点、重试策略、QueryEngine 多轮历史维护</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-05-tool-system.html">Task 5：工具系统</a>
 — <code>Tool.call()</code> 签名、<code>getAllBaseTools()</code> vs <code>getTools()</code>、条件工具注册、FileReadTool 去重、AgentTool fork 机制</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-06-multi-agent.html">Task 6：多智能体架构</a>
 — 7 种 TaskType、LocalAgentTask 上下文克隆、RemoteAgentTask HTTP 轮询、InProcessTeammateTask mailbox、Coordinator 工具过滤</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-07-security.html">Task 7：安全与沙箱</a>
 — bash AST 节点类型、FAIL-CLOSED 策略、五层防御模型、危险模式 23 类、路径约束、OS sandbox</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-08-plugins-skills.html">Task 8：插件与技能系统</a>
 — Plugin（声明式包）vs Skill（行为注入）、5 种来源加载、热重载（chokidar + 300ms 防抖）、SkillTool 执行流</p>
 </li>
-<li><p><a href="undefined">undefined</a>
-— 三层内存架构（短期 JSONL / 中期 compact 摘要 / 长期 MEMORY.md）、autoCompact 阈值计算、extractMemories 后台子代理</p>
+<li><p><a href="task-09-memory.html">Task 9：上下文与记忆管理</a>
+— 三层记忆架构（短期 JSONL / 中期 compact 摘要 / 长期 MEMORY.md）、autoCompact 阈值计算、extractMemories 后台子代理</p>
 </li>
 </ul>
 <hr>
 <h2>Phase C：设计模式提炼</h2>
 <ul>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-10-cross-cutting.html">Task 10：横切关注点分析</a>
 — 错误处理分类（5 类）、HTTP 状态码策略、权限检查时机、Tool vs Task vs Plugin vs Skill 精确边界、AsyncGenerator 选择原因、回调注入三件套</p>
 </li>
-<li><p><a href="undefined">undefined</a>
+<li><p><a href="task-12-reflection.html">Task 12：复盘与总结</a>
 — 完整系统边界图（更新版，含数据结构 + 异步边界）、10 个关键设计决策、5 个意外发现、6 条可简化的复杂度、3 个最值得复用的设计、重新设计的思考</p>
 </li>
 </ul>
 <hr>
 <h2>设计模式卡片</h2>
 <ul>
-<li><a href="undefined">undefined</a></li>
+<li><a href="patterns.html">10 个可复用模式卡片索引</a></li>
 </ul>
-<div class="table-wrap"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>模式名称</th>
+<th>核心文件</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>流式响应 + 工具调用循环</td>
+<td><code>src/query.ts</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Tool 接口统一抽象</td>
+<td><code>src/Tool.ts</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>进度上报与 UI 解耦</td>
+<td><code>src/tools/AgentTool/AgentTool.tsx</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>分层 Agent 编排</td>
+<td><code>src/tasks/LocalAgentTask/</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Coordinator-Worker 模式</td>
+<td><code>src/coordinator/coordinatorMode.ts</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>多层防御安全模型</td>
+<td><code>src/utils/bash/ast.ts</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>声明式权限规则引擎</td>
+<td><code>src/utils/permissions/</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>插件热加载与能力扩展</td>
+<td><code>src/utils/plugins/pluginLoader.ts</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>分层记忆架构</td>
+<td><code>src/memdir/memdir.ts</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>上下文压缩触发与摘要注入</td>
+<td><code>src/services/compact/autoCompact.ts</code></td>
+</tr>
+</tbody></table></div>
     </div>
   </main>
 </div>

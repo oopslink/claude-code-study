@@ -95,9 +95,37 @@ body{animation:flicker 8s infinite}
 
 @keyframes typing{from{width:0}to{width:100%}}
 .typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
 <header class="ascii-header">
 <pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
@@ -145,7 +173,7 @@ body{animation:flicker 8s infinite}
         <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="task-09-memory.html">Task 9 · 内存管理</a></td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
@@ -249,7 +277,7 @@ body{animation:flicker 8s infinite}
          │ call(args,ctx,…) │                  │ 结果：PermissionResult
          ↓                  ↓                  ↓
 ┌──────────────────┐ ┌───────────────────┐ ┌─────────────────────────┐
-│ 子系统 2：工具系统│ │ 子系统 5：内存管理│ │ 子系统 6：安全与沙箱    │
+│ 子系统 2：工具系统│ │ 子系统 5：记忆管理│ │ 子系统 6：安全与沙箱    │
 │                  │ │                   │ │                         │
 │ 核心文件：        │ │ 核心文件：         │ │ 核心文件：              │
 │  Tool.ts         │ │  memdir/memdir.ts  │ │  utils/bash/ast.ts      │
@@ -381,7 +409,7 @@ body{animation:flicker 8s infinite}
 <li>为什么这样：角色分离——coordinator 专注全局规划和结果汇总，worker 专注执行；工具集约束强制 coordinator 并行化（只能派发，不能自己做）</li>
 <li>放弃了什么：coordinator 无法做轻量级实时检查（必须派发子任务）；任务粒度必须大到值得启动子 agent</li>
 </ul>
-<p><strong>决策 6：多层内存分离（短期/中期/长期）注入不同 API 字段</strong></p>
+<p><strong>决策 6：多层记忆分离（短期/中期/长期）注入不同 API 字段</strong></p>
 <ul>
 <li>做法：短期（session JSONL → messages 数组）、中期（compact 摘要 → messages 数组头部 user 消息）、长期（MEMORY.md → system prompt）三层分别存储和注入</li>
 <li>为什么这样：Anthropic API 的 messages 数组必须以 user 消息开始（协议约束反向影响架构）；长期记忆注入 system 减少 token 消耗；compact 摘要必须是 user 角色以满足 API 格式要求</li>
@@ -432,8 +460,8 @@ body{animation:flicker 8s infinite}
 <p>LocalAgentTask / RemoteAgentTask / InProcessTeammateTask / local_bash / local_workflow / monitor_mcp / dream 七种任务类型应对的是不同级别的规模和复杂度。对于中小型项目，只需 1-2 种：同步子 agent（直接等待结果）和可选的后台子 agent（写结果到文件，轮询读取）。CoordinatorMode 的工具过滤、mailbox 优先级调度、AsyncLocalStorage 上下文隔离等机制均可省略。</p>
 <p><strong>简化 3：bash AST 安全分析层</strong></p>
 <p>Claude Code 用 tree-sitter 完整解析 bash AST，识别危险节点类型（23 类 pattern），实现多层防御。对于不需要 bash 工具的 agent，这层可以完全省略。需要 bash 工具时，可以用更简单的方案：只允许预定义的安全命令白名单，拒绝一切复杂命令，无需 AST 解析。代价是灵活性大幅降低，但安全边界更清晰。</p>
-<p><strong>简化 4：三层内存架构（短期/中期/长期）</strong></p>
-<p>Claude Code 维护 JSONL 会话历史（短期）、LLM 生成的 compact 摘要（中期）、MEMORY.md 跨会话记忆（长期）三套完整的持久化体系。对于中小型 agent，根据场景可以：只保留短期内存（无跨会话记忆需求）、或只保留简单的 system prompt 手动注入（无 compact 需求）。LLM 生成的 compact 摘要本身会消耗额外 token，中小项目可以改用简单截断策略。</p>
+<p><strong>简化 4：三层记忆架构（短期/中期/长期）</strong></p>
+<p>Claude Code 维护 JSONL 会话历史（短期）、LLM 生成的 compact 摘要（中期）、MEMORY.md 跨会话记忆（长期）三套完整的持久化体系。对于中小型 agent，根据场景可以：只保留短期记忆（无跨会话记忆需求）、或只保留简单的 system prompt 手动注入（无 compact 需求）。LLM 生成的 compact 摘要本身会消耗额外 token，中小项目可以改用简单截断策略。</p>
 <p><strong>简化 5：Plugin 安装管理系统</strong></p>
 <p>Claude Code 的 Plugin 系统支持 github/git/npm/url/local 五种来源、稀疏克隆、SHA 锁定、marketplace 名称保护、enterprise allowlist/blocklist 等完整的包管理能力。对于中小项目，可以用更简单的方案：一个 <code>~/.myagent/skills/</code> 目录，用户将 Markdown 文件放进去，agent 启动时全量扫描加载。省略安装/卸载/版本管理的全部复杂度。</p>
 <p><strong>简化 6：五层配置优先级</strong></p>
@@ -460,7 +488,7 @@ body{animation:flicker 8s infinite}
 </li>
 <li><p>权限系统的 FAIL-CLOSED 原则——遇到不确定就拒绝，这是安全设计的基本原则，与技术栈无关。</p>
 </li>
-<li><p>分层内存架构（短/中/长期）——这由 LLM 的 context window 限制决定，不是实现语言的问题。</p>
+<li><p>分层记忆架构（短/中/长期）——这由 LLM 的 context window 限制决定，不是实现语言的问题。</p>
 </li>
 </ol>
 <p><strong>会改变的设计：</strong></p>
