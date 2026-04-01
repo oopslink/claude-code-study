@@ -209,7 +209,7 @@ body{animation:flicker 8s infinite}
         <td><a href="pattern-08.html">08 · 插件热加载</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
@@ -371,7 +371,7 @@ body{animation:flicker 8s infinite}
 
 依赖方向汇总（→ = 依赖）：
   1（核心循环）→ 2（工具）→ 6（安全）
-  1 → 5（内存）
+  1 → 5（记忆）
   1 → 6（通过 canUseTool）
   1 ↔ 3（AgentTool 触发子任务，子任务内运行 query()，递归）
   2 → 3（AgentTool 创建 LocalAgentTask）
@@ -502,7 +502,7 @@ body{animation:flicker 8s infinite}
 <li><p>将 Plugin 系统简化为目录扫描——去掉 marketplace、版本管理、SHA 锁定等企业级包管理能力，只保留「放文件到目录，自动发现」的核心机制。</p>
 </li>
 </ol>
-<p>总体而言，Claude Code 的架构核心是正确的——AsyncGenerator pipeline、回调注入、权限前置、分层内存。这些设计解决了真实的技术问题，值得在任何 agent 项目中借鉴。复杂度主要来自产品边界（多平台、企业合规、多用户场景），而非过度工程。</p>
+<p>总体而言，Claude Code 的架构核心是正确的——AsyncGenerator pipeline、回调注入、权限前置、分层记忆。这些设计解决了真实的技术问题，值得在任何 agent 项目中借鉴。复杂度主要来自产品边界（多平台、企业合规、多用户场景），而非过度工程。</p>
 
     </div>
   </main>

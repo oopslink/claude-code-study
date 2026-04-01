@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>09 · 分层内存 — Claude Code 源码学习笔记</title>
+<title>09 · 分层记忆 — Claude Code 源码学习笔记</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
@@ -209,7 +209,7 @@ body{animation:flicker 8s infinite}
         <td><a href="pattern-08.html">08 · 插件热加载</a></td>
       </tr><tr class="active">
         <td>-rw-r--r--</td>
-        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
@@ -245,7 +245,7 @@ body{animation:flicker 8s infinite}
 <li>触发：token 使用量超过阈值（模型 context window - 20K 输出预留 - 13K 缓冲）</li>
 <li>生成：forked agent 共享 prompt cache，调用 LLM 生成 9 章节结构化摘要</li>
 <li>存储：压缩后的摘要作为 UserMessage 写回 JSONL，<code>SystemCompactBoundaryMessage</code> 作为切片标记</li>
-<li>恢复：加载时只读取 boundary 后的内容，大幅降低内存占用</li>
+<li>恢复：加载时只读取 boundary 后的内容，大幅降低记忆占用</li>
 </ul>
 <p><strong>层 3：长期（memory files）</strong></p>
 <ul>
@@ -259,7 +259,7 @@ body{animation:flicker 8s infinite}
 </li>
 <li><p><strong>Git root 而非 CWD 作为记忆目录键</strong>：worktree 切换场景下，不同 worktree 的 CWD 不同但 git root 相同，使用 git root 保证记忆在 worktree 切换时不会孤立。</p>
 </li>
-<li><p><strong>Compact 摘要不是&quot;内存&quot;</strong>：它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识。两者职责不同：compact 保证当前对话能继续，memory 保证跨会话知识积累。</p>
+<li><p><strong>Compact 摘要不是&quot;记忆&quot;</strong>：它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识。两者职责不同：compact 保证当前对话能继续，memory 保证跨会话知识积累。</p>
 </li>
 <li><p><strong>extractMemories 用 fork agent</strong>：共享父对话的 prompt cache（<code>cacheSafeParams</code>），零额外 context window 成本，且权限沙箱严格限制——Edit/Write 只允许写入 memory 目录内路径，MCP 和 Agent 工具完全拒绝。</p>
 </li>

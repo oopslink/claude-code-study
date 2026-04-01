@@ -209,7 +209,7 @@ body{animation:flicker 8s infinite}
         <td><a href="pattern-08.html">08 · 插件热加载</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
@@ -461,7 +461,7 @@ body{animation:flicker 8s infinite}
   3. 替换决策不一致 → 同一 tool_use_id 在不同迭代做出不同决策 → wire prefix 变化 → prompt cache miss
 
 克隆的优势：
-  1. 每个 agent 有自己的状态副本，修改互不影响（内存隔离）
+  1. 每个 agent 有自己的状态副本，修改互不影响（记忆隔离）
   2. 子 agent 读文件时，缓存在子的 readFileState 中，父的缓存保持纯净
   3. contentReplacementState 克隆后，子 agent 看到父的历史决策，继续做出相同决策 → cache hit 稳定
   4. 子 agent 完成后，其副本自动释放，父的状态完全不受污染</pre></div><p><strong>实际应用举例：</strong></p>
@@ -610,7 +610,7 @@ const result = accumulatedLog.findLast(msg =&gt; msg.type === 'result')
 </tbody></table></div><p><strong>「进程内」的核心优势：</strong></p>
 <ol>
 <li><strong>零序列化开销</strong>：直接函数调用 <code>runAgent()</code>，不需要 IPC 或 HTTP</li>
-<li><strong>共享内存状态</strong>：通过 <code>AsyncLocalStorage</code> 隔离上下文同时共享 <code>AppState</code> Store</li>
+<li><strong>共享记忆状态</strong>：通过 <code>AsyncLocalStorage</code> 隔离上下文同时共享 <code>AppState</code> Store</li>
 <li><strong>实时权限 UI</strong>：可以接入 leader 的 <code>ToolUseConfirmQueue</code>，UI 中实时展示需要审批的操作</li>
 <li><strong>上下文压缩</strong>：<code>inProcessRunner</code> 在 token 超阈值时自动调用 <code>compactConversation()</code></li>
 </ol>
@@ -691,7 +691,7 @@ while (!aborted &amp;&amp; !shouldExit):
 <tr>
 <td><code>local_agent</code></td>
 <td>本地进程内（同线程）</td>
-<td>内存隔离（克隆上下文）</td>
+<td>记忆隔离（克隆上下文）</td>
 <td>coordinator 模式的 worker；需要 LLM 完成任务</td>
 <td>需要 LLM、可后台并行、结果异步通知</td>
 </tr>
@@ -871,7 +871,7 @@ while (!aborted &amp;&amp; !shouldExit):
 </li>
 <li><p><strong>结果异步化是统一机制</strong>：无论本地还是远程，结果都通过 <code>enqueuePendingNotification()</code> 注入消息队列，父 agent 永远不「等待」子任务，而是「接收通知」。</p>
 </li>
-<li><p><strong>隔离层次与执行方式正交</strong>：LocalAgentTask 和 InProcessTeammateTask 都在本地进程内运行，但隔离机制不同——前者通过克隆 ToolUseContext 实现内存隔离，后者通过 AsyncLocalStorage 实现上下文隔离。</p>
+<li><p><strong>隔离层次与执行方式正交</strong>：LocalAgentTask 和 InProcessTeammateTask 都在本地进程内运行，但隔离机制不同——前者通过克隆 ToolUseContext 实现记忆隔离，后者通过 AsyncLocalStorage 实现上下文隔离。</p>
 </li>
 <li><p><strong>AbortController 树</strong>：整个多 agent 系统通过 AbortController 父子链形成树状取消结构。父 abort 自动传播给所有子 agent，但子 abort 不向上传播。</p>
 </li>

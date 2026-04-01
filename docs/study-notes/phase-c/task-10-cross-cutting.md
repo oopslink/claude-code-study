@@ -154,7 +154,7 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1
 
 ### Memory vs Context
 
-| 维度 | Memory（内存文件，memdir） | Context（会话上下文，sessionStorage + compact） |
+| 维度 | Memory（记忆文件，memdir） | Context（会话上下文，sessionStorage + compact） |
 |------|--------------------------|------------------------------------------------|
 | **存储路径** | `~/.claude/projects/<sanitized-git-root>/memory/`（MEMORY.md + topic 文件）；CCR 时为 `CLAUDE_CODE_REMOTE_MEMORY_DIR` | `~/.claude/projects/<sanitized-cwd>/<sessionId>.jsonl`（每行一个 Message） |
 | **数据格式** | YAML frontmatter（name/description/type）+ Markdown 正文；MEMORY.md 为索引文件 | JSONL，每行一个 `Message` 对象（含 `parentUuid` 形成链式结构） |
@@ -232,7 +232,7 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1
 
 **洞察 4：子 agent 隔离通过「克隆 + no-op 替换」而非「沙箱」实现**
 
-`createSubagentContext()` 的设计揭示了 Claude Code 的多 agent 隔离哲学：不使用 OS 级沙箱（进程隔离），而是在同一 JS 运行时内通过精心设计的对象克隆和回调替换实现内存隔离。`setAppState` 改为 no-op（后台子 agent 不更新 UI），`abortController` 新建子控制器（子 abort 不影响父），`readFileState` 克隆（子 agent 文件缓存不污染父）。这是一种「信任但隔离」的设计——子 agent 代码与父 agent 完全相同，但通过依赖注入的回调决定其行为边界。
+`createSubagentContext()` 的设计揭示了 Claude Code 的多 agent 隔离哲学：不使用 OS 级沙箱（进程隔离），而是在同一 JS 运行时内通过精心设计的对象克隆和回调替换实现记忆隔离。`setAppState` 改为 no-op（后台子 agent 不更新 UI），`abortController` 新建子控制器（子 abort 不影响父），`readFileState` 克隆（子 agent 文件缓存不污染父）。这是一种「信任但隔离」的设计——子 agent 代码与父 agent 完全相同，但通过依赖注入的回调决定其行为边界。
 
 **洞察 5：Memory 和 Context 服务于不同的时间维度，注入点也不同**
 

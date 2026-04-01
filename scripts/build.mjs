@@ -51,7 +51,7 @@ const NAV = [
       { file: 'patterns/06-multi-layer-security-defense.md', slug: 'pattern-06',  title: '06 · 多层防御安全' },
       { file: 'patterns/07-declarative-permission-rules.md', slug: 'pattern-07',  title: '07 · 声明式权限' },
       { file: 'patterns/08-plugin-hot-loading.md',           slug: 'pattern-08',  title: '08 · 插件热加载' },
-      { file: 'patterns/09-layered-memory-architecture.md',  slug: 'pattern-09',  title: '09 · 分层内存' },
+      { file: 'patterns/09-layered-memory-architecture.md',  slug: 'pattern-09',  title: '09 · 分层记忆' },
       { file: 'patterns/10-context-compression.md',          slug: 'pattern-10',  title: '10 · 上下文压缩' },
     ],
   },

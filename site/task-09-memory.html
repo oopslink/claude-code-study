@@ -209,7 +209,7 @@ body{animation:flicker 8s infinite}
         <td><a href="pattern-08.html">08 · 插件热加载</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
@@ -305,7 +305,7 @@ services/extractMemories/prompts.ts, utils/sessionStorage.ts (前 320 行)</p>
   │
   ├─ isAutoMemoryEnabled()
   │    └─→ buildMemoryLines()（单 auto 目录，返回指令文本但不含 MEMORY.md 内容）
-  │         注意：这里只返回"如何使用内存"的指令，MEMORY.md 内容通过 claudemd.ts
+  │         注意：这里只返回"如何使用记忆"的指令，MEMORY.md 内容通过 claudemd.ts
   │         的 getMemoryFiles() 路径注入（并非 buildMemoryPrompt）
   │
   └─ disabled → 返回 null（记录 telemetry）</pre></div><p><strong>注入位置</strong>：<code>loadMemoryPrompt()</code> 的结果作为 <code>systemPromptSection(&#39;memory&#39;, ...)</code> 的一部分，最终拼接在 system prompt 中。MEMORY.md 的实际内容通过 <code>claudemd.ts</code> 在 user context 部分注入（区分 agent mode 和普通 mode）。</p>
@@ -356,7 +356,7 @@ services/extractMemories/prompts.ts, utils/sessionStorage.ts (前 320 行)</p>
 <li>CLAUDE.md 中已记录的内容</li>
 <li>短暂任务细节（当前进行中的工作、临时状态）</li>
 </ul>
-<p><strong>内存文件格式</strong>（YAML frontmatter + Markdown body）：</p>
+<p><strong>记忆文件格式</strong>（YAML frontmatter + Markdown body）：</p>
 <div class="code-block"><pre>---
 name: {{memory name}}
 description: {{one-line description}}
@@ -677,7 +677,7 @@ How to save memories:
 <li>触发：token 使用量超过阈值（模型 context window - 20K 输出预留 - 13K 缓冲）</li>
 <li>生成：forked agent 共享 prompt cache，调用 LLM 生成 9 章节结构化摘要</li>
 <li>存储：压缩后的摘要作为 UserMessage 写回 JSONL，<code>SystemCompactBoundaryMessage</code> 作为切片标记</li>
-<li>恢复：加载时只读取 boundary 后的内容，大幅降低内存占用</li>
+<li>恢复：加载时只读取 boundary 后的内容，大幅降低记忆占用</li>
 </ul>
 </li>
 <li><p><strong>长期（memory files）</strong></p>
@@ -691,7 +691,7 @@ How to save memories:
 <p><strong>关键洞察</strong>：</p>
 <ul>
 <li>不同时间尺度需要不同策略：秒级内的工具调用用 in-memory state，分钟级的对话流用 JSONL 持久化，小时/天级的跨会话知识用结构化记忆文件</li>
-<li>Compact 摘要并不是&quot;内存&quot;——它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识</li>
+<li>Compact 摘要并不是&quot;记忆&quot;——它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识</li>
 <li>Git root 而非 CWD 作为记忆目录键，使 worktree 切换场景下记忆不会孤立</li>
 </ul>
 <p><strong>权衡</strong>：</p>
@@ -797,7 +797,7 @@ compactConversation()
 </tr>
 </thead><tbody><tr>
 <td><code>memdir/paths.ts</code></td>
-<td>内存路径解析、<code>getAutoMemPath()</code>、路径验证与安全检查</td>
+<td>记忆路径解析、<code>getAutoMemPath()</code>、路径验证与安全检查</td>
 </tr>
 <tr>
 <td><code>memdir/memdir.ts</code></td>

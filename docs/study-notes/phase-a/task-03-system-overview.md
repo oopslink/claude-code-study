@@ -132,7 +132,7 @@ src/tools/SkillTool/
 
 ### 子系统 5：上下文与记忆管理
 
-**memdir.ts 管理的内存类型**：
+**memdir.ts 管理的记忆类型**：
 
 `src/memdir/memdir.ts` 管理的是**持久化文件记忆**（磁盘上的 `MEMORY.md`）：
 - 入口文件名：`MEMORY.md`（常量 `ENTRYPOINT_NAME`）
@@ -286,7 +286,7 @@ src/utils/permissions/
 
 [子系统 5：上下文与记忆管理]
   ├── 直接依赖 → [子系统 1：Agent 核心循环]（memdir 注入系统提示，compact 裁剪消息历史）
-  ├── 提供给 → [子系统 1：Agent 核心循环]（内存提示内容、压缩后消息列表）
+  ├── 提供给 → [子系统 1：Agent 核心循环]（记忆提示内容、压缩后消息列表）
   └── 数据流：MEMORY.md → loadMemoryPrompt() → SystemPrompt 注入
               消息历史 token 超限 → autoCompact() → 压缩后历史 + SessionMemory 记录
 

@@ -100,7 +100,7 @@ loadMemoryPrompt()
   │
   ├─ isAutoMemoryEnabled()
   │    └─→ buildMemoryLines()（单 auto 目录，返回指令文本但不含 MEMORY.md 内容）
-  │         注意：这里只返回"如何使用内存"的指令，MEMORY.md 内容通过 claudemd.ts
+  │         注意：这里只返回"如何使用记忆"的指令，MEMORY.md 内容通过 claudemd.ts
   │         的 getMemoryFiles() 路径注入（并非 buildMemoryPrompt）
   │
   └─ disabled → 返回 null（记录 telemetry）
@@ -137,7 +137,7 @@ export const MEMORY_TYPES = ['user', 'feedback', 'project', 'reference'] as cons
 - CLAUDE.md 中已记录的内容
 - 短暂任务细节（当前进行中的工作、临时状态）
 
-**内存文件格式**（YAML frontmatter + Markdown body）：
+**记忆文件格式**（YAML frontmatter + Markdown body）：
 ```markdown
 ---
 name: {{memory name}}
@@ -482,7 +482,7 @@ How to save memories:
    - 触发：token 使用量超过阈值（模型 context window - 20K 输出预留 - 13K 缓冲）
    - 生成：forked agent 共享 prompt cache，调用 LLM 生成 9 章节结构化摘要
    - 存储：压缩后的摘要作为 UserMessage 写回 JSONL，`SystemCompactBoundaryMessage` 作为切片标记
-   - 恢复：加载时只读取 boundary 后的内容，大幅降低内存占用
+   - 恢复：加载时只读取 boundary 后的内容，大幅降低记忆占用
 
 3. **长期（memory files）**
    - 存储：`~/.claude/projects/<sanitized-git-root>/memory/*.md`（每条记忆一个文件 + MEMORY.md 索引）
@@ -491,7 +491,7 @@ How to save memories:
 
 **关键洞察**：
 - 不同时间尺度需要不同策略：秒级内的工具调用用 in-memory state，分钟级的对话流用 JSONL 持久化，小时/天级的跨会话知识用结构化记忆文件
-- Compact 摘要并不是"内存"——它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识
+- Compact 摘要并不是"记忆"——它是上下文管理（降低 token 使用），而 memory files 才是真正的跨会话知识
 - Git root 而非 CWD 作为记忆目录键，使 worktree 切换场景下记忆不会孤立
 
 **权衡**：
@@ -565,7 +565,7 @@ LLM 摘要可以：
 
 | 文件 | 职责 |
 |------|------|
-| `memdir/paths.ts` | 内存路径解析、`getAutoMemPath()`、路径验证与安全检查 |
+| `memdir/paths.ts` | 记忆路径解析、`getAutoMemPath()`、路径验证与安全检查 |
 | `memdir/memdir.ts` | `loadMemoryPrompt()`、`buildMemoryLines()`、`MEMORY.md` 截断保护 |
 | `memdir/memoryTypes.ts` | 四类型分类定义、各类型的触发时机和使用指南文本 |
 | `services/compact/autoCompact.ts` | 阈值计算、`shouldAutoCompact()`、熔断器、`autoCompactIfNeeded()` |

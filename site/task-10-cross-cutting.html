@@ -209,7 +209,7 @@ body{animation:flicker 8s infinite}
         <td><a href="pattern-08.html">08 · 插件热加载</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
-        <td><a href="pattern-09.html">09 · 分层内存</a></td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
@@ -515,7 +515,7 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1
 </tbody></table></div><h3>Memory vs Context</h3>
 <div class="table-wrap"><table><thead><tr>
 <th>维度</th>
-<th>Memory（内存文件，memdir）</th>
+<th>Memory（记忆文件，memdir）</th>
 <th>Context（会话上下文，sessionStorage + compact）</th>
 </tr>
 </thead><tbody><tr>
@@ -656,7 +656,7 @@ permissionRuleValueToString({ toolName: 'Bash', ruleContent: 'python -c "print(1
 <p><strong>洞察 3：权限系统是「调用前守门员」，而非「调用中监控者」</strong></p>
 <p><code>useCanUseTool.tsx</code> 展示的权限模型将所有安全决策前移到工具调用前。这个设计的深层含义是：系统认为工具执行本身是不可回滚的副作用，因此决不应该在执行中途中断。<code>is_error: true</code> 的 tool_result 让模型知道权限被拒，但工具从未开始运行，因此没有需要回滚的状态。<code>allowsAllowRules</code> 的分层存储（session/project/user/policy）则允许「记住选择」在不同生命周期内有效，精度达到命令前缀级别（<code>Bash(npm install)</code>），而非工具名级别（<code>Bash</code>）或命令哈希级别。</p>
 <p><strong>洞察 4：子 agent 隔离通过「克隆 + no-op 替换」而非「沙箱」实现</strong></p>
-<p><code>createSubagentContext()</code> 的设计揭示了 Claude Code 的多 agent 隔离哲学：不使用 OS 级沙箱（进程隔离），而是在同一 JS 运行时内通过精心设计的对象克隆和回调替换实现内存隔离。<code>setAppState</code> 改为 no-op（后台子 agent 不更新 UI），<code>abortController</code> 新建子控制器（子 abort 不影响父），<code>readFileState</code> 克隆（子 agent 文件缓存不污染父）。这是一种「信任但隔离」的设计——子 agent 代码与父 agent 完全相同，但通过依赖注入的回调决定其行为边界。</p>
+<p><code>createSubagentContext()</code> 的设计揭示了 Claude Code 的多 agent 隔离哲学：不使用 OS 级沙箱（进程隔离），而是在同一 JS 运行时内通过精心设计的对象克隆和回调替换实现记忆隔离。<code>setAppState</code> 改为 no-op（后台子 agent 不更新 UI），<code>abortController</code> 新建子控制器（子 abort 不影响父），<code>readFileState</code> 克隆（子 agent 文件缓存不污染父）。这是一种「信任但隔离」的设计——子 agent 代码与父 agent 完全相同，但通过依赖注入的回调决定其行为边界。</p>
 <p><strong>洞察 5：Memory 和 Context 服务于不同的时间维度，注入点也不同</strong></p>
 <p>系统实际上有三层「让模型知道事情」的机制，按时间维度分：长期（Memory，跨会话，注入 system prompt）、中期（compact 摘要，注入当前轮 messages 的开头 user 消息）、短期（session messages，注入 messages 数组的完整历史）。三者对应不同的存储后端和注入 API 字段（system 字段 vs messages 数组头部 vs messages 数组），各司其职。特别有意思的是 compact 摘要以 <code>user</code> role 消息（而非 system）注入——这是因为 Anthropic API 要求 messages 数组必须以 user 消息开始，compact boundary 后的摘要必须满足这个格式约束。这个实现细节暴露了 API 协议约束如何反向影响架构设计。</p>
 
