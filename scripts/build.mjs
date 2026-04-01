@@ -219,6 +219,25 @@ body{animation:flicker 8s infinite}
 /* matrix rain canvas */
 #matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
 .ascii-header,.layout,.statusbar{position:relative;z-index:1}
+
+/* mobile menu toggle */
+.menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
+.menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
+
+/* mobile */
+@media(max-width:700px){
+  html,body{overflow:auto}
+  .ascii-title{font-size:6px}
+  .header-meta{font-size:10px}
+  .menu-toggle{display:inline-block}
+  .layout{flex-direction:column}
+  .sidebar{width:100%;border-right:none;border-bottom:1px dashed var(--border);display:none;max-height:60vh}
+  .sidebar.open{display:flex}
+  .main{padding:16px 20px 40px}
+  .content h1{font-size:16px}
+  .page-prompt{font-size:11px}
+  .statusbar{font-size:10px;padding:5px 16px}
+}
 `
 
 // ── HTML template ─────────────────────────────────────────────────────────────
@@ -269,7 +288,10 @@ function buildPage({ slug, title, promptPath, content, sidebarHtml, totalFiles }
 <pre class="ascii-title glow">${ASCII}</pre>
 <div class="header-meta">
   <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
-  <span>[STUDY NOTES v1.0]</span>
+  <span style="display:flex;align-items:center;gap:12px">
+    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">[MENU]</button>
+    <span>[STUDY NOTES v1.0]</span>
+  </span>
 </div>
 </header>
 
