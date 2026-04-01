@@ -40,12 +40,6 @@ const NAV = [
     ],
   },
   {
-    label: '苏格拉底专题', cls: 'phase-s',
-    items: [
-      { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
-    ],
-  },
-  {
     label: '模式卡片', cls: 'phase-p',
     items: [
       { file: 'patterns/README.md',                          slug: 'patterns',    title: '模式卡片总览' },
@@ -59,6 +53,12 @@ const NAV = [
       { file: 'patterns/08-plugin-hot-loading.md',           slug: 'pattern-08',  title: '08 · 插件热加载' },
       { file: 'patterns/09-layered-memory-architecture.md',  slug: 'pattern-09',  title: '09 · 分层记忆' },
       { file: 'patterns/10-context-compression.md',          slug: 'pattern-10',  title: '10 · 上下文压缩' },
+    ],
+  },
+  {
+    label: '苏格拉底专题', cls: 'phase-s',
+    items: [
+      { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
     ],
   },
 ]
