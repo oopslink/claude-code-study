@@ -40,6 +40,12 @@ const NAV = [
     ],
   },
   {
+    label: '苏格拉底专题', cls: 'phase-s',
+    items: [
+      { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
+    ],
+  },
+  {
     label: '模式卡片', cls: 'phase-p',
     items: [
       { file: 'patterns/README.md',                          slug: 'patterns',    title: '模式卡片总览' },
@@ -170,7 +176,7 @@ body{animation:flicker 8s infinite}
 .ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
 .ls-table tr:hover:not(.active) a{color:var(--green)}
 .phase-label{font-size:11px}
-.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-s{color:#ce93d8}.phase-p{color:#ff80ab}
 .sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
 
 /* main */

