@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { execSync } from 'child_process'
 import { marked } from 'marked'
+
+const COMMIT_HASH = process.env.COMMIT_HASH
+  || (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() } catch { return 'unknown' } })()
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -306,7 +310,7 @@ function buildPage({ slug, title, promptPath, content, sidebarHtml, totalFiles }
     <div class="sidebar-scroll">
       ${sidebarHtml}
     </div>
-    <div class="sidebar-footer">${totalFiles} files found.</div>
+    <div class="sidebar-footer">${totalFiles} files found.<br>@ ${COMMIT_HASH}</div>
   </nav>
 
   <main class="main">
