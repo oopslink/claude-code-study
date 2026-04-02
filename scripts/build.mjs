@@ -64,6 +64,7 @@ const NAV = [
     label: '苏格拉底专题', cls: 'phase-s',
     items: [
       { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
+      { file: 'superpowers/storage-architecture.md', slug: 'storage-architecture', title: '专题 02 · 存储架构完全指南' },
     ],
   },
 ]

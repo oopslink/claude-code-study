@@ -3,20 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>存储架构完全指南 — Claude Code 源码学习笔记</title>
+<title>专题 02 · 存储架构完全指南 — Claude Code 源码学习笔记</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a;--yellow:#ffd740;--cyan:#40c4ff;--red:#ff5252}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
 
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
 body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
 @keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
 body{animation:flicker 8s infinite}
+
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
 .glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
 
 /* header */
@@ -50,91 +54,118 @@ body{animation:flicker 8s infinite}
 .sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
 
 /* main */
-.main{flex:1;overflow-y:auto;padding:24px 32px 40px}
-.main::-webkit-scrollbar{width:5px}
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
 .main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
 
-/* content */
-h1{font-size:16px;color:var(--green-bright);margin-bottom:4px;text-shadow:0 0 12px rgba(0,230,118,.5)}
-.subtitle{color:var(--green-dim);font-size:11px;margin-bottom:28px}
-h2{font-size:13px;color:var(--yellow);margin:28px 0 12px;padding-bottom:4px;border-bottom:1px dashed var(--border)}
-h2::before{content:'## ';color:var(--green-dim)}
-h3{font-size:12px;color:var(--cyan);margin:18px 0 8px}
-h3::before{content:'### ';color:var(--green-dim)}
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
 
-p{margin-bottom:10px;color:rgba(0,230,118,.85)}
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
 
-/* concept box */
-.concept-box{background:rgba(0,230,118,.04);border:1px dashed var(--green-dim);padding:12px 16px;margin:12px 0;font-size:12px}
-.concept-box .label{color:var(--yellow);font-size:10px;margin-bottom:6px}
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
 
-/* code */
-pre{background:rgba(0,0,0,.4);border:1px solid var(--border);padding:12px 14px;margin:10px 0;overflow-x:auto;font-size:11.5px;line-height:1.7}
-pre::-webkit-scrollbar{height:3px}
-pre::-webkit-scrollbar-thumb{background:var(--border)}
-code{color:var(--green-bright)}
-.comment{color:var(--green-dim)}
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
 
-/* table */
-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11.5px}
-th{color:var(--yellow);text-align:left;padding:5px 12px;border-bottom:1px solid var(--border);font-weight:400}
-td{padding:4px 12px;border-bottom:1px solid rgba(26,46,26,.5);color:rgba(0,230,118,.8);vertical-align:top}
-tr:hover td{background:rgba(0,230,118,.03)}
-td code{color:var(--green-bright);font-size:11px}
-td:first-child code{color:var(--cyan)}
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
 
-/* priority flow */
-.priority-flow{display:flex;align-items:center;gap:0;margin:12px 0;flex-wrap:wrap;row-gap:8px}
-.pf-item{background:rgba(0,230,118,.06);border:1px solid var(--green-dim);padding:6px 12px;font-size:11px;color:var(--green-bright)}
-.pf-item.managed{border-color:var(--red);color:var(--red)}
-.pf-item.user{border-color:var(--yellow);color:var(--yellow)}
-.pf-item.project{border-color:var(--cyan);color:var(--cyan)}
-.pf-item.local{border-color:var(--green);color:var(--green)}
-.pf-item.flag{border-color:#b388ff;color:#b388ff}
-.pf-item.policy{border-color:var(--red);color:var(--red)}
-.pf-arrow{color:var(--green-dim);padding:0 6px;font-size:13px}
-.pf-label{font-size:10px;color:var(--green-dim);margin-left:12px;align-self:flex-end;padding-bottom:7px}
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
 
-/* tree */
-.tree{background:rgba(0,0,0,.4);border:1px solid var(--border);padding:14px 16px;margin:10px 0;font-size:11px;line-height:1.9;overflow-x:auto}
-.tree .path{color:var(--cyan)}
-.tree .comment{color:var(--green-dim)}
-.tree .section{color:var(--yellow);margin-top:4px}
+/* mobile menu toggle */
+.menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
+.menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
 
-/* design rules */
-.rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
-.rule-card{background:rgba(0,230,118,.03);border:1px dashed var(--border);padding:10px 12px}
-.rule-card .rule-name{color:var(--yellow);font-size:11px;margin-bottom:4px}
-.rule-card .rule-desc{color:rgba(0,230,118,.7);font-size:11px}
-
-/* badge */
-.badge{display:inline-block;font-size:9px;padding:1px 5px;border:1px solid;vertical-align:middle;margin-left:4px}
-.badge.git{border-color:var(--cyan);color:var(--cyan)}
-.badge.secret{border-color:var(--red);color:var(--red)}
-.badge.auto{border-color:var(--yellow);color:var(--yellow)}
-
-/* footer */
-.footer{padding:8px 28px;border-top:1px dashed var(--border);font-size:10px;color:var(--green-dim);flex-shrink:0;display:flex;justify-content:space-between}
+/* mobile */
+@media(max-width:700px){
+  html,body{overflow:auto}
+  .ascii-title{font-size:6px}
+  .header-meta{font-size:10px}
+  .menu-toggle{display:inline-block}
+  .layout{flex-direction:column}
+  .sidebar{width:100%;border-right:none;border-bottom:1px dashed var(--border);display:none;max-height:60vh}
+  .sidebar.open{display:flex}
+  .main{padding:16px 20px 40px}
+  .content h1{font-size:16px}
+  .page-prompt{font-size:11px}
+  .statusbar{font-size:10px;padding:5px 16px}
+}
 </style>
 </head>
 <body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
 
-<div class="ascii-header">
-<div class="ascii-title"> ____  _____ ___  ____      _    ____ _____
-/ ___||_   _/ _ \|  _ \    / \  / ___| ____|
-\___ \  | || | | | |_) |  / _ \| |  |  _|
- ___) | | || |_| |  _ <  / ___ \ |___| |___
-|____/  |_| \___/|_| \_\/_/   \_\____|_____|</div>
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
 <div class="header-meta">
-  <span>存储架构完全指南 · claude-code source study</span>
-  <span>2026-04-02</span>
+  <span class="typed">Last updated: 2026-03-31 &nbsp;|&nbsp; claude-code main branch</span>
+  <span style="display:flex;align-items:center;gap:12px">
+    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">[MENU]</button>
+    <span>[STUDY NOTES v1.0]</span>
+  </span>
 </div>
-</div>
+</header>
 
 <div class="layout">
-
-<div class="sidebar">
-  <div class="sidebar-scroll">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+      
     <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
     <table class="ls-table">
       <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
@@ -212,251 +243,348 @@ td:first-child code{color:var(--cyan)}
         <td><a href="storage-architecture.html">专题 02 · 存储架构完全指南</a></td>
       </tr></tbody>
     </table>
-  </div>
-  <div class="sidebar-footer">24 files found.<br>@ ffd865d</div>
-</div>
-
-<div class="main" id="main-scroll">
-
-<h1 class="glow">Claude Code 存储架构完全指南</h1>
-<div class="subtitle">涵盖：设置系统 / CLAUDE.md / Skills / Transcript / History / Memory / Undo / Plans / 运行时 / 缓存 / Worktree</div>
-
-<!-- 概述 -->
-<h2 id="overview">核心概念</h2>
-<p>所有持久化数据围绕一个根目录展开：</p>
-<pre><code>~/.claude/     <span class="comment"># 默认根目录，可通过 CLAUDE_CONFIG_DIR 覆盖</span></code></pre>
-<div class="concept-box">
-  <div class="label">▶ 三套同构的四层结构</div>
-  整个体系由三套并行的四层结构组成：<b>设置系统</b>、<b>CLAUDE.md 指令体系</b>、<b>Skills 体系</b>。三套都遵循同一个优先级模型：
-  <div style="margin-top:10px">
-    <div class="priority-flow">
-      <div class="pf-item managed">Managed</div>
-      <div class="pf-arrow">→</div>
-      <div class="pf-item user">User</div>
-      <div class="pf-arrow">→</div>
-      <div class="pf-item project">Project</div>
-      <div class="pf-arrow">→</div>
-      <div class="pf-item local">Local</div>
-      <div class="pf-label">后加载 = 高优先级</div>
+  
     </div>
-  </div>
-</div>
+    <div class="sidebar-footer">24 files found.<br>@ 1f53ad1</div>
+  </nav>
 
-<!-- 认证 -->
-<h2 id="auth">一、认证与全局配置</h2>
-<table>
-  <tr><th>文件</th><th>内容</th><th>来源</th></tr>
-  <tr><td><code>~/.claude/.credentials.json</code></td><td>OAuth token、API key</td><td>auth.ts:1323</td></tr>
-  <tr><td><code>~/.claude/.config.json</code></td><td>全局 app 运行时配置（env vars 覆盖层）</td><td>env.ts:18</td></tr>
-</table>
-
-<!-- 设置系统 -->
-<h2 id="settings">二、设置系统（五层合并）</h2>
-<p>核心文件：<code>src/utils/settings/settings.ts</code>、<code>src/utils/settings/constants.ts</code></p>
-<div class="priority-flow">
-  <div class="pf-item user">userSettings</div>
-  <div class="pf-arrow">→</div>
-  <div class="pf-item project">projectSettings</div>
-  <div class="pf-arrow">→</div>
-  <div class="pf-item local">localSettings</div>
-  <div class="pf-arrow">→</div>
-  <div class="pf-item flag">flagSettings</div>
-  <div class="pf-arrow">→</div>
-  <div class="pf-item policy">policySettings</div>
-  <div class="pf-label">右边优先级更高</div>
-</div>
-<table>
-  <tr><th>Source</th><th>文件路径</th><th>备注</th></tr>
-  <tr><td><code>userSettings</code></td><td><code>~/.claude/settings.json</code></td><td>用户全局</td></tr>
-  <tr><td><code>projectSettings</code></td><td><code>&lt;repo&gt;/.claude/settings.json</code></td><td><span class="badge git">可提交 git</span></td></tr>
-  <tr><td><code>localSettings</code></td><td><code>&lt;repo&gt;/.claude/settings.local.json</code></td><td><span class="badge secret">gitignored</span> 放 secrets</td></tr>
-  <tr><td><code>flagSettings</code></td><td>--settings 启动参数</td><td>内存，不落盘</td></tr>
-  <tr><td><code>policySettings</code></td><td>企业 MDM / managed-settings.json</td><td>不可被用户覆盖</td></tr>
-</table>
-<h3>policySettings 自身四源合并</h3>
-<pre><code>1. 远程 managed settings（API 下发）               <span class="comment">← 最高</span>
-2. 平台 MDM（macOS plist / Windows HKLM）
-3. managed-settings.json + managed-settings.d/*.json  <span class="comment">← 按文件名排序</span>
-4. HKCU（Windows 用户注册表）                       <span class="comment">← 最低</span></code></pre>
-<h3>Managed 根目录（平台相关）</h3>
-<pre><code>macOS:   /Library/Application Support/ClaudeCode/
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/superpowers$ <span style="color:var(--green)">cat storage-architecture.md</span>
+    </div>
+    <div class="content">
+      <h1>Claude Code 存储架构完全指南</h1>
+<blockquote>
+<p>日期：2026-04-02
+覆盖主题：设置系统、指令文件、Skills、会话 Transcript、History、Memory、文件备份、运行时状态、缓存、安全存储、Worktree</p>
+</blockquote>
+<hr>
+<h2>核心概念</h2>
+<p>Claude Code 的所有持久化数据都围绕一个根目录展开：</p>
+<div class="code-block"><pre>~/.claude/     默认根目录，可通过 CLAUDE_CONFIG_DIR 环境变量覆盖</pre></div><p>整个存储体系由<strong>三套同构的四层结构</strong>组成——设置系统、CLAUDE.md 指令体系、Skills 体系——三套都遵循同一个优先级模型：</p>
+<div class="code-block"><pre>Managed（企业管控）→ User（用户全局）→ Project（项目共享）→ Local（本地私有）</pre></div><p>后加载的层优先级更高，后者可以覆盖前者。</p>
+<hr>
+<h2>一、认证与全局配置</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>文件</th>
+<th>内容</th>
+<th>来源</th>
+</tr>
+</thead><tbody><tr>
+<td><code>~/.claude/.credentials.json</code></td>
+<td>OAuth token、API key</td>
+<td><code>auth.ts:1323</code></td>
+</tr>
+<tr>
+<td><code>~/.claude/.config.json</code></td>
+<td>全局 app 运行时配置（env vars 覆盖层）</td>
+<td><code>env.ts:18</code></td>
+</tr>
+</tbody></table></div><hr>
+<h2>二、设置系统（五层合并）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/settings/settings.ts</code>、<code>src/utils/settings/constants.ts</code></p>
+<p>五个 source 按优先级从低到高依次合并：</p>
+<div class="code-block"><pre>userSettings    → ~/.claude/settings.json
+projectSettings → &lt;repo&gt;/.claude/settings.json        ← 可提交 git
+localSettings   → &lt;repo&gt;/.claude/settings.local.json  ← gitignored（放 secrets）
+flagSettings    → --settings 启动参数（内存，不落盘）
+policySettings  → 企业 MDM / managed-settings.json    ← 不可被用户覆盖</pre></div><p><code>policySettings</code> 自身也是多源合并（优先级从高到低）：</p>
+<ol>
+<li>远程 managed settings（API 下发）</li>
+<li>平台 MDM（macOS plist / Windows HKLM）</li>
+<li>文件：<code>managed-settings.json</code> + drop-in 目录（<code>managed-settings.d/*.json</code>，按文件名排序合并）</li>
+<li>HKCU（Windows 用户注册表）</li>
+</ol>
+<p><strong>Managed 根目录</strong>（平台相关）：</p>
+<div class="code-block"><pre>macOS:   /Library/Application Support/ClaudeCode/
 Linux:   /etc/claude-code/
-Windows: C:\Program Files\ClaudeCode\</code></pre>
-<div class="concept-box">
-  <div class="label">▶ localSettings 与 worktree</div>
-  <code>settings.local.json</code> 是 gitignored 的。worktree 创建时会 <b>copy</b>（不是 symlink）到 worktree 的 <code>.claude/</code> 目录——symlink 会共享状态，copy 才能做真正的隔离。
-</div>
-
-<!-- CLAUDE.md -->
-<h2 id="claudemd">三、指令文件系统（CLAUDE.md 体系）</h2>
-<p>核心文件：<code>src/utils/claudemd.ts</code>　·　越晚加载优先级越高</p>
-<pre><code><span class="comment"># 加载顺序（从低到高优先级）</span>
-1. /etc/claude-code/CLAUDE.md                          <span class="comment">Managed</span>
-2. /etc/claude-code/.claude/rules/*.md                 <span class="comment">Managed rules</span>
-3. ~/.claude/CLAUDE.md                                 <span class="comment">User</span>
-4. ~/.claude/rules/*.md                                <span class="comment">User rules</span>
-5. &lt;每级目录&gt;/CLAUDE.md                               <span class="comment">Project，root → cwd</span>
-6. &lt;每级目录&gt;/.claude/CLAUDE.md                       <span class="comment">Project</span>
-7. &lt;每级目录&gt;/.claude/rules/*.md                      <span class="comment">Project rules</span>
-8. &lt;每级目录&gt;/CLAUDE.local.md                         <span class="comment">Local，gitignored</span>
-9. ~/.claude/projects/&lt;cwd&gt;/memory/MEMORY.md          <span class="comment">memdir（若启用）</span>
-10. ~/.claude/projects/&lt;cwd&gt;/memory/team/MEMORY.md    <span class="comment">团队记忆（若启用）</span></code></pre>
-<h3>@include 指令</h3>
-<pre><code><span class="comment"># CLAUDE.md 内可引入其他文件</span>
-@./relative/path
+Windows: C:\Program Files\ClaudeCode\</pre></div><p><code>localSettings</code> 是 gitignored 的，worktree 创建时会 <strong>copy</strong>（不是 symlink）到 worktree 的 <code>.claude/</code> 目录，实现真正隔离。</p>
+<hr>
+<h2>三、指令文件系统（CLAUDE.md 体系）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/claudemd.ts</code></p>
+<p>文件按以下顺序加载，<strong>越晚加载优先级越高</strong>（模型更关注后出现的内容）：</p>
+<h3>加载顺序</h3>
+<div class="code-block"><pre>1. Managed CLAUDE.md       /etc/claude-code/CLAUDE.md
+2. Managed rules           /etc/claude-code/.claude/rules/*.md
+3. User CLAUDE.md          ~/.claude/CLAUDE.md
+4. User rules              ~/.claude/rules/*.md
+5. Project CLAUDE.md       &lt;每级目录&gt;/CLAUDE.md            ← 从 root 到 cwd 逐级
+6. Project .claude CLAUDE  &lt;每级目录&gt;/.claude/CLAUDE.md
+7. Project rules           &lt;每级目录&gt;/.claude/rules/*.md
+8. Local CLAUDE.md         &lt;每级目录&gt;/CLAUDE.local.md      ← gitignored
+9. memdir MEMORY.md        ~/.claude/projects/&lt;cwd&gt;/memory/MEMORY.md（若启用）
+10. Team MEMORY.md         ~/.claude/projects/&lt;cwd&gt;/memory/team/MEMORY.md（若启用）</pre></div><p>Project 和 Local 文件在每一级目录都会检查（从文件系统根目录走到 cwd），离 cwd 越近的目录优先级越高。</p>
+<h3>关键特性</h3>
+<p><strong><code>@include</code> 指令</strong>：CLAUDE.md 内可用 <code>@path</code> 引入其他文件。</p>
+<div class="code-block"><pre>@./relative/path
 @~/home/path
-@/absolute/path</code></pre>
-<p>循环引用被检测并跳过；项目目录外的引入需用户明确授权。</p>
-<h3>嵌套 Worktree 去重</h3>
-<p>在 <code>.claude/worktrees/&lt;slug&gt;/</code> 内运行时，向上遍历经过 worktree 根和主仓库根。Project 类型文件只从 worktree 自身 checkout 读取，避免重复加载。</p>
+@/absolute/path</pre></div><p>循环引用会被检测并跳过，不存在的文件静默忽略。外部 include（项目目录外）需用户明确授权。</p>
+<p><strong>嵌套 Worktree 去重</strong>：当 Claude 在 <code>.claude/worktrees/&lt;slug&gt;/</code> 内运行时，向上遍历会经过 worktree 根和主仓库根，Project 类型文件只从 worktree 自身的 checkout 读取，避免重复加载。</p>
+<h3>完整路径汇总</h3>
+<div class="code-block"><pre>/etc/claude-code/
+├── CLAUDE.md              # Managed 全局指令
+└── .claude/rules/*.md     # Managed rules
 
-<!-- Skills -->
-<h2 id="skills">四、Skills 与 Commands</h2>
-<p>核心文件：<code>src/skills/loadSkillsDir.ts</code>、<code>src/utils/skills/skillChangeDetector.ts</code></p>
-<pre><code><span class="comment"># Skills 目录（三层）</span>
-/etc/claude-code/.claude/skills/&lt;name&gt;/SKILL.md   <span class="comment">Managed</span>
-~/.claude/skills/&lt;name&gt;/SKILL.md                  <span class="comment">User</span>
-&lt;repo&gt;/.claude/skills/&lt;name&gt;/SKILL.md             <span class="comment">Project，向上遍历到 home</span>
+~/.claude/
+├── CLAUDE.md              # User 全局指令
+└── rules/*.md             # User rules
 
-<span class="comment"># Legacy commands（仍支持）</span>
+&lt;repo&gt;/
+├── CLAUDE.md              # Project 指令（提交 git）
+├── CLAUDE.local.md        # Local 指令（gitignored）
+└── .claude/
+    ├── CLAUDE.md          # Project 指令（提交 git）
+    └── rules/*.md         # Project rules（提交 git）</pre></div><hr>
+<h2>四、Skills 与 Commands</h2>
+<p><strong>核心文件</strong>：<code>src/skills/loadSkillsDir.ts</code>、<code>src/utils/skills/skillChangeDetector.ts</code></p>
+<h3>目录结构</h3>
+<div class="code-block"><pre>/etc/claude-code/.claude/skills/&lt;name&gt;/SKILL.md   # Managed
+~/.claude/skills/&lt;name&gt;/SKILL.md                  # User
+&lt;repo&gt;/.claude/skills/&lt;name&gt;/SKILL.md             # Project（向上遍历到 home）
+
+# Legacy commands（仍支持）
 /etc/claude-code/.claude/commands/
 ~/.claude/commands/
-&lt;repo&gt;/.claude/commands/</code></pre>
-<p>Skills 格式：必须是 <code>&lt;name&gt;/SKILL.md</code> 子目录，不支持散落单文件。</p>
-<h3>热加载机制</h3>
-<table>
-  <tr><th>机制</th><th>说明</th></tr>
-  <tr><td>chokidar 监听</td><td>监听 skills/commands 目录变化（depth: 2）</td></tr>
-  <tr><td>debounce 300ms</td><td>批量变更（git pull）合并为单次重载</td></tr>
-  <tr><td>Bun 下用 stat() 轮询</td><td>2s 间隔，绕开 Bun FSWatcher 死锁 bug</td></tr>
-</table>
-
-<!-- Transcript -->
-<h2 id="transcript">五、会话 Transcript（JSONL）</h2>
-<p>核心文件：<code>src/utils/sessionStorage.ts</code></p>
-<pre><code>~/.claude/projects/&lt;sanitized-cwd&gt;/&lt;session-id&gt;.jsonl</code></pre>
-<p><code>sanitized-cwd</code>：工作目录路径把非字母数字字符替换成 <code>-</code>，确保唯一性。</p>
-<h3>Entry 类型</h3>
-<table>
-  <tr><th>类型</th><th>内容</th></tr>
-  <tr><td><code>user</code> / <code>assistant</code></td><td>对话消息</td></tr>
-  <tr><td><code>tool_use</code> / <code>tool_result</code></td><td>工具调用与结果</td></tr>
-  <tr><td><code>context-collapse-*</code></td><td>上下文压缩边界</td></tr>
-  <tr><td><code>file-history-snapshot</code></td><td>文件编辑快照（undo 用）</td></tr>
-  <tr><td><code>worktree-state</code></td><td>worktree 进入/退出，供 --resume 恢复</td></tr>
-  <tr><td><code>attribution-snapshot</code></td><td>commit 归因信息</td></tr>
-</table>
-
-<!-- History -->
-<h2 id="history">六、输入历史</h2>
-<p>核心文件：<code>src/history.ts</code>、<code>src/utils/pasteStore.ts</code></p>
-<pre><code>~/.claude/history.jsonl          <span class="comment"># 全局输入历史（追加写入，lockfile 保护）</span>
-~/.claude/paste-cache/&lt;hash&gt;.txt <span class="comment"># 大文本粘贴，SHA256[:16] 命名</span></code></pre>
-<h3>两级存储策略</h3>
-<table>
-  <tr><th>粘贴大小</th><th>存储方式</th></tr>
-  <tr><td>≤ 1024 字节</td><td>内联在 history.jsonl 条目内</td></tr>
-  <tr><td>&gt; 1024 字节</td><td>存入 paste-cache/，history.jsonl 只存 hash</td></tr>
-  <tr><td>图片</td><td>单独走 image-cache/ 路径，不进 history.jsonl</td></tr>
-</table>
+&lt;repo&gt;/.claude/commands/</pre></div><p>Skills 目录格式：必须是 <code>&lt;skill-name&gt;/SKILL.md</code>（子目录），不支持散落的单 <code>.md</code> 文件。</p>
+<h3>热加载</h3>
+<p><code>skillChangeDetector.ts</code> 用 <strong>chokidar</strong> 监听目录变化：</p>
+<ul>
+<li>检测到变更后 debounce <strong>300ms</strong> 再重载，防止批量变更（如 git pull）触发雪崩</li>
+<li>Bun 下改用 <strong>stat() 轮询</strong>（2s 间隔），绕开 Bun FSWatcher 死锁 bug（oven-sh/bun#27469）</li>
+<li>重载后清除 memoize 缓存，通知所有监听者</li>
+</ul>
+<hr>
+<h2>五、会话 Transcript（JSONL）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/sessionStorage.ts</code></p>
+<div class="code-block"><pre>~/.claude/projects/&lt;sanitized-cwd&gt;/&lt;session-id&gt;.jsonl</pre></div><p><code>sanitized-cwd</code> 是工作目录路径把非字母数字字符替换成 <code>-</code> 后的字符串，确保唯一性。</p>
+<h3>文件内容</h3>
+<p>每行一条 <code>Entry</code>，类型包括：</p>
+<ul>
+<li><code>user</code> / <code>assistant</code> 消息</li>
+<li><code>tool_use</code> / <code>tool_result</code></li>
+<li><code>context-collapse-snapshot</code> / <code>context-collapse-commit</code>（压缩边界）</li>
+<li><code>file-history-snapshot</code>（文件快照，用于 undo）</li>
+<li><code>worktree-state</code>（worktree 进入/退出状态，用于 <code>--resume</code>）</li>
+<li><code>attribution-snapshot</code>（commit 归因）</li>
+</ul>
+<h3>Worktree Session</h3>
+<p>Worktree 会话用 <code>getSessionProjectDir()</code>（而非按 cwd 派生），transcript 存在 worktree 路径对应的 project 目录下，不污染主仓库历史。</p>
+<p><code>worktree-state</code> entry 记录完整的恢复信息：</p>
+<div class="code-block"><pre>{
+  originalCwd, worktreePath, worktreeName, worktreeBranch,
+  originalBranch, originalHeadCommit, sessionId, tmuxSessionName
+}</pre></div><p>退出 worktree 时写 <code>null</code>，<code>--resume</code> 时读取此字段恢复上下文。</p>
+<hr>
+<h2>六、输入历史</h2>
+<p><strong>核心文件</strong>：<code>src/history.ts</code>、<code>src/utils/pasteStore.ts</code></p>
+<div class="code-block"><pre>~/.claude/history.jsonl          # 全局输入历史（所有项目共享，追加写入）
+~/.claude/paste-cache/&lt;hash&gt;.txt # 大文本粘贴（内容寻址）</pre></div><h3>两级存储策略</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>粘贴内容大小</th>
+<th>存储方式</th>
+</tr>
+</thead><tbody><tr>
+<td>≤ 1024 字节</td>
+<td>内联在 history.jsonl 条目内</td>
+</tr>
+<tr>
+<td>&gt; 1024 字节</td>
+<td>SHA256 前 16 位作为文件名存入 paste-cache，history.jsonl 只存 hash</td>
+</tr>
+</tbody></table></div><p>图片不存入 history.jsonl，单独走 <code>image-cache/</code> 路径。</p>
 <h3>写入机制</h3>
-<pre><code>追加写入（appendFile）→ lockfile 串行化 → 内存缓冲 pendingEntries
-→ 异步 flush → cleanup hook 兜底（进程退出时确保落盘）
-Esc 中断：从 pendingEntries 撤销；若已 flush 则加入 skippedTimestamps 跳过</code></pre>
-
-<!-- Memory -->
-<h2 id="memory">七、Memory 系统（memdir）</h2>
-<p>核心文件：<code>src/memdir/memdir.ts</code></p>
-<pre><code>~/.claude/projects/&lt;cwd&gt;/memory/
-├── MEMORY.md          <span class="comment"># 索引（上限 200 行 / 25KB）</span>
-├── user_role.md       <span class="comment"># topic 文件</span>
-├── feedback_*.md
-└── team/              <span class="comment"># Team memory（TEAMMEM 功能）</span>
-    └── MEMORY.md</code></pre>
-<h3>四类型分类法</h3>
-<table>
-  <tr><th>类型</th><th>用途</th></tr>
-  <tr><td><code>user</code></td><td>用户角色、偏好、知识背景</td></tr>
-  <tr><td><code>feedback</code></td><td>对 Claude 行为的修正与肯定（含 Why / How to apply）</td></tr>
-  <tr><td><code>project</code></td><td>项目背景、目标、决策（含 Why / How to apply）</td></tr>
-  <tr><td><code>reference</code></td><td>外部系统指针（Linear、Grafana 等）</td></tr>
-</table>
-<div class="concept-box">
-  <div class="label">▶ MEMORY.md 约束</div>
-  是<b>索引</b>不是内容。超过 200 行或 25KB 时截断并附 warning，提示压缩。各 topic 文件带 YAML frontmatter（name / description / type）。<br><br>
-  KAIROS 模式（长期 assistant session）改为 append-only 日志：<code>logs/YYYY/MM/YYYY-MM-DD.md</code>，由 nightly /dream 蒸馏成 MEMORY.md。
-</div>
-
-<!-- File History -->
-<h2 id="filehistory">八、文件编辑历史（Undo）</h2>
-<p>核心文件：<code>src/utils/fileHistory.ts</code></p>
-<pre><code>~/.claude/file-history/&lt;session-id&gt;/&lt;fileNameHash&gt;@v&lt;version&gt;</code></pre>
-<p>每次 Claude 编辑文件<b>之前</b>，先把当前内容备份到此目录。文件名：<code>sha256(filePath)[:16] + "@v" + version</code>。</p>
-<p><code>--resume</code> 时，旧 session 的所有备份会 hardlink 迁移到新 session 目录，确保 undo 跨 session 有效。</p>
-
-<!-- Plans -->
-<h2 id="plans">九、Plans（计划模式）</h2>
-<p>核心文件：<code>src/utils/plans.ts</code></p>
-<pre><code>~/.claude/plans/&lt;slug&gt;.md               <span class="comment"># 主对话计划</span>
-~/.claude/plans/&lt;slug&gt;-agent-&lt;id&gt;.md    <span class="comment"># 子 agent 计划</span></code></pre>
-<p>如果项目 <code>settings.json</code> 配置了 <code>plansDir</code>，则存到项目内路径。<code>/clear</code> 时重置 slug 生成新文件。</p>
-
-<!-- Runtime -->
-<h2 id="runtime">十、运行时状态</h2>
+<ul>
+<li><strong>追加写入</strong>（<code>appendFile</code>），不覆盖，天然支持并发</li>
+<li><strong>lockfile 保护</strong>：多进程同时写入时通过文件锁串行化，防止条目交叉</li>
+<li><strong>内存缓冲</strong>：写入先进 <code>pendingEntries</code>，异步 flush，Esc 中断时可从缓冲中撤销（<code>removeLastFromHistory</code>）</li>
+<li>进程退出时 cleanup hook 确保未 flush 的条目写盘</li>
+</ul>
+<hr>
+<h2>七、Memory 系统（memdir）</h2>
+<p><strong>核心文件</strong>：<code>src/memdir/memdir.ts</code>、<code>src/memdir/paths.ts</code></p>
+<div class="code-block"><pre>~/.claude/projects/&lt;cwd&gt;/memory/
+├── MEMORY.md                    # 索引文件（上限 200 行 / 25KB）
+├── user_role.md                 # 各类 topic 文件
+├── feedback_testing.md
+└── team/                        # Team memory（TEAMMEM 功能，可选）
+    ├── MEMORY.md
+    └── ...</pre></div><h3>四类型分类法</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>类型</th>
+<th>用途</th>
+</tr>
+</thead><tbody><tr>
+<td><code>user</code></td>
+<td>用户角色、偏好、知识背景</td>
+</tr>
+<tr>
+<td><code>feedback</code></td>
+<td>对 Claude 行为的修正与肯定</td>
+</tr>
+<tr>
+<td><code>project</code></td>
+<td>项目背景、目标、决策</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>外部系统指针（Linear、Grafana 等）</td>
+</tr>
+</tbody></table></div><h3>关键约束</h3>
+<ul>
+<li><code>MEMORY.md</code> 是<strong>索引</strong>，不是内容——每行一个指针，超过 200 行或 25KB 时截断并附 warning</li>
+<li>各 topic 文件带 YAML frontmatter（<code>name</code>/<code>description</code>/<code>type</code>）</li>
+<li>KAIROS 模式（长期 assistant session）改为 append-only 日志写法：<code>logs/YYYY/MM/YYYY-MM-DD.md</code>，由 nightly <code>/dream</code> 蒸馏成 MEMORY.md</li>
+</ul>
+<hr>
+<h2>八、文件编辑历史（Undo）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/fileHistory.ts</code></p>
+<div class="code-block"><pre>~/.claude/file-history/&lt;session-id&gt;/&lt;fileNameHash&gt;@v&lt;version&gt;</pre></div><p>每次 Claude 编辑文件<strong>之前</strong>，先把当前文件内容备份到此目录。文件名格式：<code>{sha256(filePath)[:16]}@v{version}</code>。</p>
+<p><code>--resume</code> 时，旧 session 的所有备份文件会迁移（hardlink）到新 session 目录，确保 undo 在跨 session 恢复后仍然有效。</p>
+<hr>
+<h2>九、Plans（计划模式）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/plans.ts</code></p>
+<div class="code-block"><pre>~/.claude/plans/&lt;slug&gt;.md               # 主对话计划
+~/.claude/plans/&lt;slug&gt;-agent-&lt;id&gt;.md    # 子 agent 计划</pre></div><p>如果项目 <code>settings.json</code> 配置了 <code>plansDir</code>，则存到项目内指定路径。<code>/clear</code> 时重置 slug 生成新文件，不覆盖旧计划。</p>
+<hr>
+<h2>十、运行时状态</h2>
 <h3>并发会话注册</h3>
-<pre><code>~/.claude/sessions/&lt;pid&gt;.json   <span class="comment"># claude ps 的数据源</span></code></pre>
-<p>每个进程写 PID 文件，记录 sessionId、kind（interactive/bg/daemon）、status（busy/idle/waiting）。崩溃后下次启动扫描清理僵尸文件。</p>
-<h3>图片 / 上传 / Shell 快照</h3>
-<pre><code>~/.claude/image-cache/&lt;session&gt;/   <span class="comment"># 粘贴图片，按 session 隔离</span>
-~/.claude/uploads/&lt;session&gt;/       <span class="comment"># IDE bridge 上传的附件</span>
-~/.claude/shell-snapshots/          <span class="comment"># Bash 工具跨调用保持 shell 状态</span></code></pre>
-
-<!-- Cache -->
-<h2 id="cache">十一、缓存与诊断</h2>
-<table>
-  <tr><th>路径</th><th>内容</th></tr>
-  <tr><td><code>~/.claude/cache/changelog.md</code></td><td>发布日志缓存</td></tr>
-  <tr><td><code>~/.claude/cache/</code></td><td>model capabilities 缓存</td></tr>
-  <tr><td><code>~/.claude/stats-cache.json</code></td><td>token 用量统计缓存</td></tr>
-  <tr><td><code>~/.claude/debug/&lt;session&gt;.txt</code></td><td>--debug 模式调试日志</td></tr>
-  <tr><td><code>~/.claude/startup-perf/&lt;session&gt;.txt</code></td><td>启动耗时剖析数据</td></tr>
-  <tr><td><code>~/.claude/traces/</code></td><td>Perfetto 性能追踪数据</td></tr>
-  <tr><td><code>{xdg-cache}/claude-cli/&lt;cwd&gt;/errors/</code></td><td>错误日志（XDG 缓存目录）</td></tr>
-  <tr><td><code>{xdg-cache}/claude-cli/&lt;cwd&gt;/mcp-logs-&lt;server&gt;/</code></td><td>MCP server 日志</td></tr>
-</table>
-
-<!-- Secure Storage -->
-<h2 id="secure">十二、安全存储（凭证）</h2>
-<p>核心文件：<code>src/utils/secureStorage/index.ts</code></p>
-<pre><code>macOS:   Keychain → 失败时降级到 plainTextStorage
-Linux:   plainTextStorage <span class="comment">（TODO: libsecret）</span>
-Windows: plainTextStorage</code></pre>
-<p>Fallback 策略：macOS 优先写 Keychain，失败自动降级，不阻断启动流程。</p>
-
-<!-- Worktree -->
-<h2 id="worktree">十三、Worktree 存储</h2>
-<p>核心文件：<code>src/utils/worktree.ts</code></p>
-<pre><code>&lt;repo&gt;/.claude/worktrees/&lt;slug&gt;/      <span class="comment"># git worktree 实体</span>
+<div class="code-block"><pre>~/.claude/sessions/&lt;pid&gt;.json</pre></div><p>每个运行中的 Claude 进程写一个 PID 文件，记录 <code>sessionId</code>、<code>kind</code>（<code>interactive</code>/<code>bg</code>/<code>daemon</code>）、<code>status</code>（<code>busy</code>/<code>idle</code>/<code>waiting</code>）等。<code>claude ps</code> 从这里读取。进程退出时自动清理；崩溃后下次启动扫描并删除僵尸文件。</p>
+<h3>图片缓存</h3>
+<div class="code-block"><pre>~/.claude/image-cache/&lt;session-id&gt;/&lt;filename&gt;</pre></div><p>用户粘贴的图片按 session 隔离存储，支持时间 based 清理。</p>
+<h3>Bridge 上传（IDE 集成）</h3>
+<div class="code-block"><pre>~/.claude/uploads/&lt;session-id&gt;/</pre></div><p>IDE 插件通过 bridge 协议发来的附件，按 session 隔离。</p>
+<h3>Shell 快照</h3>
+<div class="code-block"><pre>~/.claude/shell-snapshots/</pre></div><p>Bash 工具跨调用保持 shell 环境状态（工作目录、环境变量等）的序列化快照。</p>
+<hr>
+<h2>十一、缓存与诊断</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>路径</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td><code>~/.claude/cache/changelog.md</code></td>
+<td>发布日志缓存（releaseNotes.ts）</td>
+</tr>
+<tr>
+<td><code>~/.claude/cache/</code></td>
+<td>model capabilities 缓存</td>
+</tr>
+<tr>
+<td><code>~/.claude/stats-cache.json</code></td>
+<td>token 用量统计缓存</td>
+</tr>
+<tr>
+<td><code>~/.claude/debug/&lt;session&gt;.txt</code></td>
+<td><code>--debug</code> 模式调试日志（按 session）</td>
+</tr>
+<tr>
+<td><code>~/.claude/startup-perf/&lt;session&gt;.txt</code></td>
+<td>启动耗时剖析数据</td>
+</tr>
+<tr>
+<td><code>~/.claude/traces/</code></td>
+<td>Perfetto 性能追踪数据</td>
+</tr>
+</tbody></table></div><hr>
+<h2>十二、安全存储（凭证）</h2>
+<p><strong>核心文件</strong>：<code>src/utils/secureStorage/index.ts</code></p>
+<div class="code-block"><pre>macOS:   Keychain → 失败时降级到 plainTextStorage
+Linux:   plainTextStorage（TODO: libsecret）
+Windows: plainTextStorage</pre></div><p>Fallback 策略：macOS 优先写 Keychain，读/写失败自动降级，不阻断启动流程。</p>
+<hr>
+<h2>十三、Worktree 存储</h2>
+<p><strong>核心文件</strong>：<code>src/utils/worktree.ts</code></p>
+<div class="code-block"><pre>&lt;repo&gt;/
 └── .claude/
-    └── settings.local.json           <span class="comment"># 从主仓库 copy</span></code></pre>
-<p>嵌套 slug（<code>user/feature</code>）展平为 <code>user+feature</code>，避免 git ref D/F 冲突与父目录删除联带删子问题。</p>
-<h3>创建时的操作</h3>
-<table>
-  <tr><th>操作</th><th>内容</th><th>原因</th></tr>
-  <tr><td>copyFile</td><td>settings.local.json</td><td>含 secrets，不能 symlink</td></tr>
-  <tr><td>git config</td><td>core.hooksPath → 主仓库 .husky/</td><td>worktree 无自己的 hooks</td></tr>
-  <tr><td>symlinkDirectories</td><td>node_modules 等（按配置）</td><td>避免磁盘膨胀</td></tr>
-  <tr><td>copyWorktreeIncludeFiles</td><td>.worktreeinclude 匹配的 gitignored 文件</td><td>把 .env 等本地配置带入</td></tr>
-</table>
-<pre><code><span class="comment"># .worktreeinclude：项目根目录下，gitignore 语法</span>
-.env
-config/secrets/*.key
-<span class="comment"># → 创建 worktree 时把这些 gitignored 文件 copy 过去</span></code></pre>
-
-<!-- Complete Tree -->
-<h2 id="tree">完整目录树</h2>
-<div class="tree">
-<span class="section">/etc/claude-code/</span>                         <span class="comment">← Managed 根（Linux）</span>
+    └── worktrees/
+        └── &lt;slug&gt;/              # git worktree 实体
+            └── .claude/
+                └── settings.local.json   # 从主仓库 copy 过来</pre></div><p>嵌套 slug（<code>user/feature</code>）展平为 <code>user+feature</code>，避免 git ref D/F 冲突。</p>
+<h3>创建时做了什么</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>操作</th>
+<th>内容</th>
+<th>原因</th>
+</tr>
+</thead><tbody><tr>
+<td><code>copyFile</code></td>
+<td><code>settings.local.json</code></td>
+<td>含 secrets，不能 symlink（共享状态）</td>
+</tr>
+<tr>
+<td><code>git config core.hooksPath</code></td>
+<td>指向主仓库 <code>.husky/</code> 或 <code>.git/hooks/</code></td>
+<td>worktree 没有自己的 hooks</td>
+</tr>
+<tr>
+<td><code>symlinkDirectories</code></td>
+<td><code>node_modules</code> 等（按配置）</td>
+<td>避免磁盘膨胀</td>
+</tr>
+<tr>
+<td><code>copyWorktreeIncludeFiles</code></td>
+<td><code>.worktreeinclude</code> 匹配的 gitignored 文件</td>
+<td>把 <code>.env</code> 等本地配置带入 worktree</td>
+</tr>
+</tbody></table></div><p><strong><code>.worktreeinclude</code></strong>：项目根目录下的文件，使用 gitignore 语法声明哪些 gitignored 文件要复制进 worktree。</p>
+<hr>
+<h2>十四、其他文件</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>路径</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td><code>~/.claude/keybindings.json</code></td>
+<td>自定义键绑定</td>
+</tr>
+<tr>
+<td><code>~/.claude/ide/</code></td>
+<td>IDE 集成 IPC socket</td>
+</tr>
+<tr>
+<td><code>~/.claude/plugins/</code></td>
+<td>已安装插件</td>
+</tr>
+<tr>
+<td><code>~/.claude/backups/</code></td>
+<td>设置变更前的配置备份</td>
+</tr>
+<tr>
+<td><code>~/.claude/jobs/</code></td>
+<td>后台任务</td>
+</tr>
+<tr>
+<td><code>~/.claude/tasks/</code></td>
+<td>Tasks 工具持久化</td>
+</tr>
+<tr>
+<td><code>~/.claude/chrome/</code></td>
+<td>Claude in Chrome 集成</td>
+</tr>
+<tr>
+<td><code>~/.claude/local/</code></td>
+<td>本地安装器文件</td>
+</tr>
+<tr>
+<td><code>~/.claude/computer-use.lock</code></td>
+<td>computer-use 工具互斥锁</td>
+</tr>
+<tr>
+<td><code>~/.claude/.update.lock</code></td>
+<td>自动更新互斥锁</td>
+</tr>
+<tr>
+<td><code>~/.claude/.npm-cache-cleanup</code></td>
+<td>一次性清理 marker</td>
+</tr>
+<tr>
+<td><code>~/.claude/.version-cleanup</code></td>
+<td>版本清理 marker</td>
+</tr>
+</tbody></table></div><p>XDG 缓存目录（<code>{platform-cache}/claude-cli/&lt;cwd&gt;/</code>）另有：<code>errors/</code>、<code>messages/</code>、<code>mcp-logs-&lt;server&gt;/</code>。</p>
+<hr>
+<h2>完整目录树</h2>
+<div class="code-block"><pre>/etc/claude-code/                   ← Managed 根（Linux）
 ├── CLAUDE.md
 ├── managed-settings.json
 ├── managed-settings.d/*.json
@@ -464,104 +592,111 @@ config/secrets/*.key
     ├── rules/*.md
     └── skills/&lt;name&gt;/SKILL.md
 
-<span class="section">~/.claude/</span>                                <span class="comment">← User 根</span>
-├── <span class="path">.credentials.json</span>                     <span class="comment"># OAuth/API key</span>
-├── <span class="path">.config.json</span>                          <span class="comment"># 全局 app 配置</span>
-├── .update.lock / computer-use.lock      <span class="comment"># 互斥锁</span>
-├── .npm-cache-cleanup / .version-cleanup <span class="comment"># 清理 marker</span>
-├── <span class="path">settings.json</span>                         <span class="comment"># User 设置</span>
-├── <span class="path">CLAUDE.md</span>                             <span class="comment"># User 指令</span>
-├── <span class="path">rules/*.md</span>                            <span class="comment"># User rules</span>
-├── <span class="path">skills/&lt;name&gt;/SKILL.md</span>               <span class="comment"># User skills</span>
-├── <span class="path">commands/</span>                             <span class="comment"># User legacy commands</span>
-├── <span class="path">keybindings.json</span>                      <span class="comment"># 自定义键绑定</span>
-├── <span class="path">history.jsonl</span>                         <span class="comment"># 全局输入历史</span>
-├── <span class="path">paste-cache/&lt;hash&gt;.txt</span>               <span class="comment"># 大文本粘贴（内容寻址）</span>
-├── <span class="path">image-cache/&lt;session&gt;/</span>               <span class="comment"># 图片粘贴</span>
-├── <span class="path">uploads/&lt;session&gt;/</span>                   <span class="comment"># IDE bridge 上传</span>
-├── <span class="path">file-history/&lt;session&gt;/</span>              <span class="comment"># 文件编辑备份（undo）</span>
-├── <span class="path">plans/&lt;slug&gt;.md</span>                      <span class="comment"># EnterPlanMode 计划</span>
-├── <span class="path">sessions/&lt;pid&gt;.json</span>                  <span class="comment"># 并发进程注册（claude ps）</span>
-├── <span class="path">stats-cache.json</span>                      <span class="comment"># token 用量缓存</span>
-├── <span class="path">cache/</span>                                <span class="comment"># changelog、model capabilities</span>
-├── <span class="path">debug/&lt;session&gt;.txt</span>                  <span class="comment"># --debug 日志</span>
-├── <span class="path">startup-perf/&lt;session&gt;.txt</span>           <span class="comment"># 启动性能数据</span>
-├── <span class="path">traces/</span>                               <span class="comment"># Perfetto 追踪</span>
-├── <span class="path">shell-snapshots/</span>                      <span class="comment"># Shell 环境快照</span>
-├── <span class="path">ide/</span>                                  <span class="comment"># IDE IPC socket</span>
-├── <span class="path">plugins/</span>                              <span class="comment"># 已安装插件</span>
-├── <span class="path">backups/</span>                              <span class="comment"># 设置变更备份</span>
-├── <span class="path">jobs/ tasks/ chrome/ local/</span>          <span class="comment"># 后台任务、本地安装等</span>
-└── <span class="path">projects/&lt;sanitized-cwd&gt;/</span>            <span class="comment"># 每个工作目录一个子目录</span>
-    ├── <span class="path">&lt;session-id&gt;.jsonl</span>               <span class="comment"># 会话 transcript</span>
-    └── <span class="path">memory/</span>                          <span class="comment"># memdir 持久化记忆</span>
-        ├── MEMORY.md                        <span class="comment"># 索引（200行/25KB上限）</span>
-        ├── &lt;topic&gt;.md
-        └── <span class="path">team/MEMORY.md</span>               <span class="comment"># 团队共享记忆（TEAMMEM）</span>
+~/.claude/                          ← User 根
+├── .credentials.json               # OAuth/API key
+├── .config.json                    # 全局 app 配置
+├── .update.lock                    # 自动更新互斥
+├── .npm-cache-cleanup              # 清理 marker
+├── .version-cleanup                # 清理 marker
+├── settings.json                   # User 设置
+├── CLAUDE.md                       # User 指令
+├── rules/*.md                      # User rules
+├── skills/&lt;name&gt;/SKILL.md          # User skills
+├── commands/                       # User legacy commands
+├── keybindings.json                # 键绑定
+├── history.jsonl                   # 全局输入历史
+├── paste-cache/&lt;hash&gt;.txt          # 大文本粘贴（内容寻址）
+├── image-cache/&lt;session&gt;/          # 图片粘贴
+├── uploads/&lt;session&gt;/              # IDE bridge 上传
+├── file-history/&lt;session&gt;/         # 文件编辑备份（undo）
+├── plans/&lt;slug&gt;.md                 # EnterPlanMode 计划
+├── sessions/&lt;pid&gt;.json             # 并发进程注册
+├── stats-cache.json                # token 用量缓存
+├── cache/                          # changelog、model capabilities
+├── debug/&lt;session&gt;.txt             # 调试日志
+├── startup-perf/&lt;session&gt;.txt      # 启动性能数据
+├── traces/                         # Perfetto 追踪
+├── shell-snapshots/                # Shell 环境快照
+├── ide/                            # IDE IPC socket
+├── plugins/                        # 已安装插件
+├── backups/                        # 设置备份
+├── jobs/                           # 后台任务
+├── tasks/                          # Tasks 持久化
+├── computer-use.lock               # computer-use 互斥
+├── chrome/                         # Claude in Chrome
+├── local/                          # 本地安装器
+└── projects/&lt;sanitized-cwd&gt;/       # 每个工作目录一个子目录
+    ├── &lt;session-id&gt;.jsonl          # 会话 transcript
+    └── memory/                     # memdir 持久化记忆
+        ├── MEMORY.md               # 索引（200行/25KB上限）
+        ├── &lt;topic&gt;.md              # topic 文件
+        └── team/                   # 团队共享记忆（TEAMMEM）
+            └── MEMORY.md
 
-<span class="section">&lt;repo&gt;/</span>                                   <span class="comment">← 项目根目录</span>
-├── <span class="path">CLAUDE.md</span>                             <span class="comment"># Project 指令 [git]</span>
-├── <span class="path">CLAUDE.local.md</span>                       <span class="comment"># Local 指令 [gitignored]</span>
-├── <span class="path">.worktreeinclude</span>                      <span class="comment"># 声明哪些文件复制进 worktree</span>
-└── <span class="path">.claude/</span>
-    ├── settings.json                        <span class="comment"># Project 设置 [git]</span>
-    ├── settings.local.json                  <span class="comment"># Local 设置 [gitignored]</span>
-    ├── CLAUDE.md                            <span class="comment"># Project 指令 [git]</span>
-    ├── rules/*.md                           <span class="comment"># Project rules</span>
-    ├── skills/&lt;name&gt;/SKILL.md              <span class="comment"># Project skills</span>
-    └── <span class="path">worktrees/&lt;slug&gt;/</span>               <span class="comment"># git worktree 实体</span>
-        └── .claude/settings.local.json      <span class="comment"># 从主仓库 copy</span>
+&lt;repo&gt;/                             # 项目根目录
+├── CLAUDE.md                       # Project 指令（提交 git）
+├── CLAUDE.local.md                 # Local 指令（gitignored）
+├── .worktreeinclude                # 声明哪些 gitignored 文件复制进 worktree
+└── .claude/
+    ├── settings.json               # Project 设置（提交 git）
+    ├── settings.local.json         # Local 设置（gitignored）
+    ├── CLAUDE.md                   # Project 指令（提交 git）
+    ├── rules/*.md                  # Project rules
+    ├── skills/&lt;name&gt;/SKILL.md      # Project skills
+    └── worktrees/&lt;slug&gt;/           # git worktree 实体
+        └── .claude/
+            └── settings.local.json # 从主仓库 copy
 
-<span class="section">{xdg-cache}/claude-cli/&lt;cwd&gt;/</span>            <span class="comment">← 平台缓存目录</span>
+{platform-cache}/claude-cli/&lt;cwd&gt;/  # XDG 缓存（平台相关）
 ├── errors/
 ├── messages/
-└── mcp-logs-&lt;server&gt;/
+└── mcp-logs-&lt;server&gt;/</pre></div><hr>
+<h2>设计规律总结</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>规律</th>
+<th>体现</th>
+</tr>
+</thead><tbody><tr>
+<td><strong>三套同构四层</strong></td>
+<td>设置、CLAUDE.md、Skills 都是 Managed→User→Project→Local</td>
+</tr>
+<tr>
+<td><strong>追加写入</strong></td>
+<td><code>history.jsonl</code>、session <code>.jsonl</code>——避免随机写，支持并发</td>
+</tr>
+<tr>
+<td><strong>内容寻址</strong></td>
+<td><code>paste-cache/</code>——SHA256 命名，天然去重，覆写安全</td>
+</tr>
+<tr>
+<td><strong>lockfile</strong></td>
+<td><code>history.jsonl</code> 写入时加锁，防多进程交叉写</td>
+</tr>
+<tr>
+<td><strong>两级粘贴</strong></td>
+<td>小内联大外存，history 文件不膨胀</td>
+</tr>
+<tr>
+<td><strong>session 隔离</strong></td>
+<td><code>image-cache/</code>、<code>file-history/</code>、<code>uploads/</code> 都按 session 子目录隔离</td>
+</tr>
+<tr>
+<td><strong>Worktree copy 不 symlink</strong></td>
+<td>secrets 类文件（<code>settings.local.json</code>）必须 copy，大无状态目录（<code>node_modules</code>）才 symlink</td>
+</tr>
+<tr>
+<td><strong>XDG 规范</strong></td>
+<td>cache 和 config 目录分离，平台路径由 <code>env-paths</code> 统一管理</td>
+</tr>
+</tbody></table></div>
+    </div>
+  </main>
 </div>
 
-<!-- Design Patterns -->
-<h2 id="patterns">设计规律总结</h2>
-<div class="rule-grid">
-  <div class="rule-card">
-    <div class="rule-name">三套同构四层</div>
-    <div class="rule-desc">设置、CLAUDE.md、Skills 都是<br>Managed → User → Project → Local</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">追加写入</div>
-    <div class="rule-desc">history.jsonl、session .jsonl<br>避免随机写，支持多进程并发</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">内容寻址</div>
-    <div class="rule-desc">paste-cache/ 用 SHA256 命名<br>天然去重，覆写安全</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">lockfile 保护</div>
-    <div class="rule-desc">history.jsonl 写入时加锁<br>防多进程交叉写入</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">两级粘贴存储</div>
-    <div class="rule-desc">小内联大外存<br>history 文件不因大粘贴膨胀</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">session 隔离</div>
-    <div class="rule-desc">image-cache、file-history、uploads<br>都按 session 子目录隔离</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">copy 不 symlink</div>
-    <div class="rule-desc">secrets（settings.local.json）必须 copy<br>大无状态目录（node_modules）才 symlink</div>
-  </div>
-  <div class="rule-card">
-    <div class="rule-name">XDG 规范</div>
-    <div class="rule-desc">cache 和 config 分离<br>平台路径由 env-paths 统一管理</div>
-  </div>
-</div>
-
-</div><!-- main -->
-</div><!-- layout -->
-
-<div class="footer">
-  <span>storage-architecture · Claude Code 源码学习笔记</span>
-  <span>src: settings.ts · claudemd.ts · sessionStorage.ts · history.ts · memdir.ts · fileHistory.ts · worktree.ts</span>
-</div>
+<footer class="statusbar">
+  <span>[MODE: NORMAL] &nbsp; [ENCODING: UTF-8] &nbsp; [BRANCH: main]</span>
+  <span>© 2026 &nbsp;<b>claude-code-study</b></span>
+</footer>
 
 </body>
 </html>
