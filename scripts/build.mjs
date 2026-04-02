@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
 import { marked } from 'marked'
 
-const COMMIT_HASH = process.env.COMMIT_HASH
+const COMMIT_HASH = (process.env.COMMIT_HASH
   || (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() } catch { return 'unknown' } })()
+).slice(0, 8)
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
