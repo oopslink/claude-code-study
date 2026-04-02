@@ -28,17 +28,26 @@ body{animation:flicker 8s infinite}
 .layout{flex:1;display:flex;overflow:hidden}
 
 /* sidebar */
-.sidebar{width:240px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
-.sidebar-scroll{flex:1;overflow-y:auto;padding:12px 0 8px}
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
 .sidebar-scroll::-webkit-scrollbar{width:4px}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
-.prompt{color:var(--green-dim);padding:0 14px 8px;font-size:11px;white-space:nowrap}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
 .prompt b{color:var(--green-bright)}
-.nav-section{padding:4px 14px 2px;font-size:10px;color:var(--green-dim);text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
-.nav-item{display:block;padding:4px 14px;font-size:11.5px;color:var(--green-dim);cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .1s}
-.nav-item:hover,.nav-item.active{color:var(--green-bright);background:rgba(0,230,118,.04)}
-.nav-item.active::before{content:'▶ '}
-.nav-item::before{content:'  '}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-s{color:#ce93d8}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
 
 /* main */
 .main{flex:1;overflow-y:auto;padding:24px 32px 40px}
@@ -126,25 +135,85 @@ td:first-child code{color:var(--cyan)}
 
 <div class="sidebar">
   <div class="sidebar-scroll">
-    <div class="prompt">[<b>storage</b>]$ ls -la<span class="cursor"></span></div>
-    <div class="nav-section">章节</div>
-    <a class="nav-item active" href="#overview" onclick="scrollTo('overview')">概述</a>
-    <a class="nav-item" href="#auth" onclick="scrollTo('auth')">认证与全局配置</a>
-    <a class="nav-item" href="#settings" onclick="scrollTo('settings')">设置系统（五层）</a>
-    <a class="nav-item" href="#claudemd" onclick="scrollTo('claudemd')">CLAUDE.md 体系</a>
-    <a class="nav-item" href="#skills" onclick="scrollTo('skills')">Skills 与 Commands</a>
-    <a class="nav-item" href="#transcript" onclick="scrollTo('transcript')">会话 Transcript</a>
-    <a class="nav-item" href="#history" onclick="scrollTo('history')">输入历史</a>
-    <a class="nav-item" href="#memory" onclick="scrollTo('memory')">Memory 系统</a>
-    <a class="nav-item" href="#filehistory" onclick="scrollTo('filehistory')">文件编辑历史</a>
-    <a class="nav-item" href="#plans" onclick="scrollTo('plans')">Plans</a>
-    <a class="nav-item" href="#runtime" onclick="scrollTo('runtime')">运行时状态</a>
-    <a class="nav-item" href="#cache" onclick="scrollTo('cache')">缓存与诊断</a>
-    <a class="nav-item" href="#secure" onclick="scrollTo('secure')">安全存储</a>
-    <a class="nav-item" href="#worktree" onclick="scrollTo('worktree')">Worktree 存储</a>
-    <a class="nav-item" href="#tree" onclick="scrollTo('tree')">完整目录树</a>
-    <a class="nav-item" href="#patterns" onclick="scrollTo('patterns')">设计规律</a>
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-s">苏格拉底专题/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="socratic-01-security-and-agent-loop.html">专题 01 · 安全与 Agent 循环</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="storage-architecture.html">专题 02 · 存储架构完全指南</a></td>
+      </tr></tbody>
+    </table>
   </div>
+  <div class="sidebar-footer">24 files found.</div>
 </div>
 
 <div class="main" id="main-scroll">
@@ -494,25 +563,5 @@ config/secrets/*.key
   <span>src: settings.ts · claudemd.ts · sessionStorage.ts · history.ts · memdir.ts · fileHistory.ts · worktree.ts</span>
 </div>
 
-<script>
-const main = document.getElementById('main-scroll')
-const navItems = document.querySelectorAll('.nav-item')
-
-main.addEventListener('scroll', () => {
-  const sections = document.querySelectorAll('h2[id]')
-  let current = ''
-  sections.forEach(s => {
-    if (s.offsetTop - 80 <= main.scrollTop) current = s.id
-  })
-  navItems.forEach(n => {
-    n.classList.toggle('active', n.getAttribute('href') === '#' + current)
-  })
-})
-
-window.scrollTo = (id) => {
-  const el = document.getElementById(id)
-  if (el) main.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' })
-}
-</script>
 </body>
 </html>
