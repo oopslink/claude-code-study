@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>专题 03 · Hook 子系统 — Claude Code 源码学习笔记</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#00e676;--green-dim:#00b050;--green-bright:#69ff9c;--bg:#0a0d0a;--bg2:#0d110d;--border:#1a2e1a}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--green);font-family:'JetBrains Mono','Courier New',monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column}
+
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);pointer-events:none;z-index:9999}
+
+@keyframes flicker{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.97}94%{opacity:1}96%{opacity:.98}97%{opacity:1}}
+body{animation:flicker 8s infinite}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--green);vertical-align:middle;animation:blink 1s step-end infinite;margin-left:2px}
+
+.glow{text-shadow:0 0 8px var(--green),0 0 20px rgba(0,230,118,.4)}
+
+/* header */
+.ascii-header{padding:18px 28px 12px;border-bottom:1px dashed var(--border);flex-shrink:0}
+.ascii-title{font-size:10.5px;line-height:1.2;white-space:pre;color:var(--green);text-shadow:0 0 10px rgba(0,230,118,.5);overflow:hidden}
+.header-meta{color:var(--green-dim);font-size:11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;white-space:nowrap;gap:16px}
+
+/* layout */
+.layout{flex:1;display:flex;overflow:hidden}
+
+/* sidebar */
+.sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px dashed var(--border);overflow:hidden}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px 0 8px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border)}
+.prompt{color:var(--green-dim);padding:0 16px 10px;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.prompt b{color:var(--green-bright)}
+.ls-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ls-table th{padding:3px 16px;text-align:left;color:var(--green-dim);font-size:10px;letter-spacing:2px;border-bottom:1px solid var(--border);font-weight:700;white-space:nowrap}
+.ls-table th:first-child{width:88px}
+.ls-table td{padding:4px 16px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-table tr.dir td{color:var(--green-bright);font-weight:700}
+.ls-table tr.file td{color:var(--green-dim)}
+.ls-table tr.file a{color:inherit;text-decoration:none}
+.ls-table tr.active td{background:var(--green);color:#000;font-weight:700}
+.ls-table tr.active a{color:#000;text-decoration:none}
+.ls-table tr:hover:not(.active) td{background:rgba(0,230,118,.07);color:var(--green);cursor:pointer}
+.ls-table tr:hover:not(.active) a{color:var(--green)}
+.phase-label{font-size:11px}
+.phase-a{color:#69ff9c}.phase-b{color:#40c8ff}.phase-c{color:#ffd740}.phase-s{color:#ce93d8}.phase-p{color:#ff80ab}
+.sidebar-footer{padding:10px 16px;color:var(--green-dim);font-size:11px;border-top:1px dashed var(--border);flex-shrink:0}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:24px 40px 40px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
+.page-prompt{color:var(--green-dim);margin-bottom:18px;font-size:12px}
+.page-prompt b{color:var(--green-bright)}
+
+/* markdown content */
+.content h1{font-size:20px;font-weight:700;color:var(--green-bright);margin-bottom:16px;text-shadow:0 0 12px rgba(105,255,156,.4)}
+.content h1::before{content:'# ';color:var(--green-dim)}
+.content h2{font-size:15px;font-weight:700;color:var(--green);margin:28px 0 10px}
+.content h2::before{content:'## ';color:var(--green-dim)}
+.content h3{font-size:13px;font-weight:700;color:var(--green-dim);margin:20px 0 8px}
+.content h3::before{content:'### ';color:var(--border)}
+.content p{color:var(--green-dim);line-height:1.85;margin-bottom:16px;font-size:13px}
+.content a{color:var(--green);text-decoration:none;border-bottom:1px dashed var(--green-dim)}
+.content a:hover{color:var(--green-bright)}
+.content strong{color:var(--green)}
+.content em{color:var(--green-dim)}
+.content code{color:var(--green-bright);font-size:12px}
+.content ul,.content ol{color:var(--green-dim);padding-left:20px;margin-bottom:16px;font-size:13px}
+.content li{margin-bottom:4px;line-height:1.7}
+.content hr{border:none;border-top:1px dashed var(--border);margin:20px 0}
+.content blockquote{border-left:3px solid var(--green-dim);padding-left:14px;color:var(--green-dim);margin:16px 0;font-style:italic}
+
+/* code blocks */
+.code-block{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:16px 20px;margin:16px 0 24px;overflow-x:auto}
+.code-block pre{font-size:12px;line-height:1.75;color:var(--green-dim);white-space:pre}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin:16px 0}
+.table-wrap table{border-collapse:collapse;font-size:12px;width:100%}
+.table-wrap th{padding:6px 14px;color:var(--green);border-bottom:1px solid var(--green-dim);text-align:left;letter-spacing:1px;font-size:10px;text-transform:uppercase}
+.table-wrap td{padding:6px 14px;color:var(--green-dim);border-bottom:1px dashed var(--border)}
+.table-wrap tr:hover td{background:rgba(0,230,118,.04)}
+
+/* status bar */
+.statusbar{border-top:1px dashed var(--border);padding:5px 28px;display:flex;justify-content:space-between;font-size:11px;color:var(--green-dim);background:var(--bg2);flex-shrink:0;white-space:nowrap}
+.statusbar b{color:var(--green)}
+
+@keyframes typing{from{width:0}to{width:100%}}
+.typed{overflow:hidden;white-space:nowrap;display:inline-block;animation:typing 1.2s steps(40) .3s both}
+
+/* matrix rain canvas */
+#matrix-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.045}
+.ascii-header,.layout,.statusbar{position:relative;z-index:1}
+
+/* mobile menu toggle */
+.menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
+.menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
+
+/* mobile */
+@media(max-width:700px){
+  html,body{overflow:auto}
+  .ascii-title{font-size:6px}
+  .header-meta{font-size:10px}
+  .menu-toggle{display:inline-block}
+  .layout{flex-direction:column}
+  .sidebar{width:100%;border-right:none;border-bottom:1px dashed var(--border);display:none;max-height:60vh}
+  .sidebar.open{display:flex}
+  .main{padding:16px 20px 40px}
+  .content h1{font-size:16px}
+  .page-prompt{font-size:11px}
+  .statusbar{font-size:10px;padding:5px 16px}
+}
+
+/* mermaid diagram */
+.mermaid-wrap{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:20px;margin:16px 0 24px;overflow-x:auto}
+.mermaid{font-size:11px}
+.mermaid svg{max-width:100%}
+</style>
+</head>
+<body>
+<canvas id="matrix-canvas"></canvas>
+<script>
+(function(){
+  const c=document.getElementById('matrix-canvas')
+  const ctx=c.getContext('2d')
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン01'
+  let cols,drops
+  function resize(){
+    c.width=window.innerWidth;c.height=window.innerHeight
+    cols=Math.floor(c.width/18);drops=Array(cols).fill(1)
+  }
+  resize();window.addEventListener('resize',resize)
+  setInterval(function(){
+    ctx.fillStyle='rgba(10,13,10,0.05)'
+    ctx.fillRect(0,0,c.width,c.height)
+    ctx.fillStyle='#00e676';ctx.font='14px monospace'
+    drops.forEach(function(y,i){
+      ctx.fillText(chars[Math.random()*chars.length|0],i*18,y*18)
+      if(y*18>c.height&&Math.random()>0.975)drops[i]=0
+      drops[i]++
+    })
+  },60)
+})()
+</script>
+
+<header class="ascii-header">
+<pre class="ascii-title glow">  ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗     ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║     ██║     ███████║██║   ██║██║  ██║█████╗      ██║     ██║   ██║██║  ██║█████╗
+ ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝      ██║     ██║   ██║██║  ██║██╔══╝
+ ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗
+  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝</pre>
+<div class="header-meta">
+  <span class="typed">Last updated: 2026-04-02 &nbsp;|&nbsp; claude-code main branch</span>
+  <span style="display:flex;align-items:center;gap:12px">
+    <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">[MENU]</button>
+    <span>[STUDY NOTES v1.0]</span>
+  </span>
+</div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-scroll">
+
+    <div class="prompt"><b>guest@claude-study</b>:~/notes$ ls<span class="cursor"></span></div>
+    <table class="ls-table">
+      <thead><tr><th>PERMS</th><th>NAME</th></tr></thead>
+      <tbody><tr class="dir"><td></td><td class="phase-label phase-a">Phase A/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-01-startup.html">Task 1 · 启动流程</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-02-data-structures.html">Task 2 · 数据结构</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-03-system-overview.html">Task 3 · 子系统</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-b">Phase B/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-04-agent-loop.html">Task 4 · Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-05-tool-system.html">Task 5 · 工具系统</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-06-multi-agent.html">Task 6 · 多智能体</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-07-security.html">Task 7 · 安全沙箱</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-08-plugins-skills.html">Task 8 · 插件技能</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-09-memory.html">Task 9 · 上下文管理</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-c">Phase C/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-10-cross-cutting.html">Task 10 · 横切关注点</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="task-12-reflection.html">Task 12 · 复盘总结</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-p">模式卡片/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="patterns.html">模式卡片总览</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-01.html">01 · 流式工具循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-02.html">02 · Tool 接口抽象</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-03.html">03 · 进度上报解耦</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-04.html">04 · 分层 Agent 编排</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-05.html">05 · Coordinator 模式</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-06.html">06 · 多层防御安全</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-07.html">07 · 声明式权限</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-08.html">08 · 插件热加载</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-09.html">09 · 分层记忆</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="pattern-10.html">10 · 上下文压缩</a></td>
+      </tr><tr class="dir"><td></td><td class="phase-label phase-s">苏格拉底专题/</td></tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="socratic-01-security-and-agent-loop.html">专题 01 · 安全与 Agent 循环</a></td>
+      </tr><tr class="file">
+        <td>-rw-r--r--</td>
+        <td><a href="storage-architecture.html">专题 02 · 存储架构完全指南</a></td>
+      </tr><tr class="active">
+        <td>-rw-r--r--</td>
+        <td><a href="topic-hook-system.html">专题 03 · Hook 子系统</a></td>
+      </tr></tbody>
+    </table>
+
+    </div>
+    <div class="sidebar-footer">25 files found.<br>@ 1909120f</div>
+  </nav>
+
+  <main class="main">
+    <div class="page-prompt">
+      <b>guest@claude-study</b>:~/notes/superpowers$ <span style="color:var(--green)">cat topic-hook-system.md</span>
+    </div>
+    <div class="content">
+      <h1>Hook 子系统完全指南</h1>
+<blockquote>
+<p>日期：2026-04-02<br>
+覆盖主题：Hook 事件体系、Hook 类型、配置结构、继承层级、执行流程、典型应用场景<br>
+关键文件：<code>src/utils/hooks.ts</code> · <code>src/utils/hooks/</code> · <code>src/schemas/hooks.ts</code> · <code>src/types/hooks.ts</code></p>
+</blockquote>
+<hr>
+<h2>概述</h2>
+<p>Hook 子系统是 Claude Code 的<strong>事件驱动中间件层</strong>，允许用户在 Claude Code 生命周期的任意节点注入自定义逻辑。它支持 26 个事件、5 种执行类型，可以读取工具输入、修改工具参数、阻断执行、注入上下文，或向外部系统发送通知。</p>
+<p>所有 hook 的调度入口是 <code>src/utils/hooks.ts:executeHooks()</code>，匹配逻辑在 <code>getMatchingHooks()</code>，配置快照在 <code>src/utils/hooks/hooksConfigSnapshot.ts</code>。</p>
+<hr>
+<h2>一、Hook 事件体系</h2>
+<p>共 26 个事件，按关注域分为五类：</p>
+<h3>工具执行类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>触发时机</th><th>可修改输入</th><th>可阻断</th></tr></thead>
+<tbody>
+<tr><td><code>PreToolUse</code></td><td>工具调用前</td><td>是（updatedInput）</td><td>是</td></tr>
+<tr><td><code>PostToolUse</code></td><td>工具成功后</td><td>MCP 工具输出可改</td><td>是</td></tr>
+<tr><td><code>PostToolUseFailure</code></td><td>工具失败后</td><td>否</td><td>否</td></tr>
+<tr><td><code>PermissionRequest</code></td><td>权限弹窗出现时</td><td>否</td><td>是（deny/allow/ask）</td></tr>
+<tr><td><code>PermissionDenied</code></td><td>auto mode 拒绝调用时</td><td>否</td><td>否</td></tr>
+</tbody>
+</table></div>
+<p>matcher 字段使用权限规则语法过滤 tool_name，例如 <code>Bash(git:*)</code> 只匹配 git 相关命令。</p>
+<h3>会话生命周期类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>matcher 字段</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>SessionStart</code></td><td>source（startup/resume/clear/compact）</td><td>会话开始，可区分首次启动与恢复</td></tr>
+<tr><td><code>SessionEnd</code></td><td>reason</td><td>会话结束（logout/clear 等）</td></tr>
+<tr><td><code>Setup</code></td><td>trigger（init/maintenance）</td><td>仓库初始化或维护</td></tr>
+<tr><td><code>SubagentStart</code></td><td>agent_type</td><td>Agent 工具调用发起子 agent</td></tr>
+<tr><td><code>SubagentStop</code></td><td>agent_type</td><td>子 agent 结束</td></tr>
+</tbody>
+</table></div>
+<h3>用户交互类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>UserPromptSubmit</code></td><td>用户提交 prompt 时，可修改或阻断</td></tr>
+<tr><td><code>Stop</code></td><td>Claude 完成一轮回复后</td></tr>
+<tr><td><code>StopFailure</code></td><td>本轮因 API 错误中断时，matcher 为 error 类型</td></tr>
+</tbody>
+</table></div>
+<h3>压缩类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>matcher</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>PreCompact</code></td><td>trigger（manual/auto）</td><td>压缩前，可保存关键上下文</td></tr>
+<tr><td><code>PostCompact</code></td><td>trigger（manual/auto）</td><td>压缩后，可重新注入状态</td></tr>
+</tbody>
+</table></div>
+<h3>系统集成类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>matcher</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>Notification</code></td><td>notification_type</td><td>各类通知触发</td></tr>
+<tr><td><code>ConfigChange</code></td><td>source</td><td>配置文件在会话中变更</td></tr>
+<tr><td><code>InstructionsLoaded</code></td><td>load_reason</td><td>CLAUDE.md 等指令文件加载时</td></tr>
+<tr><td><code>Elicitation</code></td><td>mcp_server_name</td><td>MCP server 请求用户输入</td></tr>
+<tr><td><code>ElicitationResult</code></td><td>mcp_server_name</td><td>用户响应 MCP 请求后</td></tr>
+<tr><td><code>WorktreeCreate</code></td><td>—</td><td>创建 git worktree 时</td></tr>
+<tr><td><code>WorktreeRemove</code></td><td>—</td><td>删除 worktree 时</td></tr>
+<tr><td><code>TeammateIdle</code></td><td>—</td><td>多 agent 协作中队友空闲</td></tr>
+<tr><td><code>TaskCreated</code></td><td>—</td><td>任务被创建时</td></tr>
+<tr><td><code>TaskCompleted</code></td><td>—</td><td>任务完成时</td></tr>
+<tr><td><code>CwdChanged</code></td><td>—</td><td>工作目录切换后</td></tr>
+<tr><td><code>FileChanged</code></td><td>文件名（basename）</td><td>被监听的文件发生变化</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2>二、Hook 类型</h2>
+<p>定义在 <code>src/schemas/hooks.ts</code>，支持 5 种类型：</p>
+<div class="table-wrap"><table>
+<thead><tr><th>类型</th><th>执行方式</th><th>适用场景</th></tr></thead>
+<tbody>
+<tr><td><code>command</code></td><td>Shell 进程（bash/powershell）</td><td>格式化、测试、日志、通知</td></tr>
+<tr><td><code>prompt</code></td><td>LLM 评估（用 $ARGUMENTS 引用输入）</td><td>语义校验、智能审批</td></tr>
+<tr><td><code>agent</code></td><td>带工具的子 agent</td><td>复杂验证、自动修复</td></tr>
+<tr><td><code>http</code></td><td>POST JSON 到外部 endpoint</td><td>CI/CD 集成、审计系统</td></tr>
+<tr><td><code>callback/function</code></td><td>内部 JS 回调（SDK 使用）</td><td>结构化输出、归因追踪等内部机制</td></tr>
+</tbody>
+</table></div>
+<p>所有类型共有字段：<code>if</code>（前置条件，权限规则语法）、<code>timeout</code>（秒）、<code>statusMessage</code>（UI 显示文字）、<code>once</code>（单次触发后自动移除）。</p>
+<p><code>command</code> 类型额外支持：<code>async</code>（后台执行）、<code>asyncRewake</code>（后台执行，exit code 2 时唤醒模型）。</p>
+<hr>
+<h2>三、配置结构</h2>
+<div class="code-block"><pre>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git:*)",     // 可选，缺省则匹配所有
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' >> ~/.claude/git-log.txt",
+            "timeout": 10,
+            "if": "Bash(git commit*)"  // 二次条件过滤
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | { read -r f; prettier --write \"$f\"; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}</pre></div>
+<p>Hook 通过 stdin 接收 JSON 格式的 <code>hookInput</code>，可以返回 JSON 控制执行流：</p>
+<div class="code-block"><pre>{
+  "continue": false,              // 阻断后续执行
+  "stopReason": "安全策略拦截",
+  "systemMessage": "显示给用户的提示",
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",  // allow / deny / ask
+    "updatedInput": { ... },       // 修改工具输入（PreToolUse）
+    "additionalContext": "..."     // 注入模型上下文
+  }
+}</pre></div>
+<p><strong>exit code 语义</strong>（command 类型）：</p>
+<div class="table-wrap"><table>
+<thead><tr><th>exit code</th><th>行为</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>成功，stdout 记录到 transcript</td></tr>
+<tr><td>2</td><td><strong>阻断</strong>，stderr 传给模型作为错误上下文</td></tr>
+<tr><td>其他非零</td><td>非阻断错误，stderr 显示给用户</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2>四、配置层级与合并规则</h2>
+<p>Hook <strong>不是覆盖继承，而是合并叠加</strong>——所有来源的 hook 都会被收集并并行执行。</p>
+<div class="code-block"><pre>来源（优先级从低到高）：
+  builtinHook      内部 JS callback
+  pluginHook       plugin hooks.json
+  sessionHook      运行时注册（内存）
+  userSettings     ~/.claude/settings.json
+  projectSettings  .claude/settings.json
+  localSettings    .claude/settings.local.json
+  policySettings   managed-settings.json（企业管控）</pre></div>
+<p>企业管控（policySettings）可强制限制下层：</p>
+<div class="table-wrap"><table>
+<thead><tr><th>策略配置</th><th>效果</th></tr></thead>
+<tbody>
+<tr><td><code>disableAllHooks: true</code>（policySettings）</td><td>全部禁用，包括 managed 自身</td></tr>
+<tr><td><code>disableAllHooks: true</code>（非 managed）</td><td>只禁 user/project/local，managed 仍执行</td></tr>
+<tr><td><code>allowManagedHooksOnly: true</code></td><td>只执行 policySettings 里的 hooks</td></tr>
+<tr><td><code>strictPluginOnlyCustomization: ["hooks"]</code></td><td>只允许 plugin hooks</td></tr>
+</tbody>
+</table></div>
+<p><strong>去重规则</strong>（<code>src/utils/hooks/hooksSettings.ts:isHookEqual()</code>）：同一来源上下文中，<code>command + shell + if</code> 完全相同的 hook 只执行一次。跨 plugin 的同名 hook 不去重（避免模板冲突误删）。</p>
+<hr>
+<h2>五、执行流程</h2>
+<p>完整执行序列（<code>src/utils/hooks.ts</code>）：</p>
+<div class="mermaid-wrap">
+<pre class="mermaid">
+sequenceDiagram
+    participant Caller as Tool Executor
+    participant EH as executeHooks
+    participant GMH as getMatchingHooks
+    participant Snap as hooksConfigSnapshot
+    participant CMD as execCommandHook
+    participant Shell as Shell Process
+    participant AsyncReg as AsyncHookRegistry
+
+    Caller->>EH: executeHooks(hookInput, ...)
+
+    alt disableAllHooks / SIMPLE env / trust fail
+        EH-->>Caller: return empty
+    end
+
+    EH->>GMH: getMatchingHooks(sessionId, hookEvent, hookInput)
+    GMH->>Snap: getHooksConfigFromSnapshot()
+    Snap-->>GMH: snapshot matchers
+    GMH->>GMH: merge registeredHooks + sessionHooks
+    GMH->>GMH: filter by matcher pattern
+    GMH->>GMH: deduplicate (command+shell+if)
+    GMH->>GMH: filter by if condition
+    GMH-->>EH: matchedHooks[]
+
+    EH->>Caller: yield hook_progress messages
+
+    par all hooks in parallel
+        EH->>CMD: execCommandHook(hook, jsonInput)
+        CMD->>Shell: spawn(bash, stdin=jsonInput)
+
+        alt async mode
+            Shell-->>CMD: {"async":true}
+            CMD->>AsyncReg: executeInBackground()
+            CMD-->>EH: backgrounded=true
+        else sync
+            Shell-->>CMD: stdout + exitCode
+
+            alt exitCode==0, JSON stdout
+                CMD->>CMD: processHookJSONOutput (Zod)
+                CMD-->>EH: updatedInput / additionalContext / block
+            else exitCode==2
+                CMD-->>EH: blockingError
+            else exitCode!=0
+                CMD-->>EH: non_blocking_error
+            end
+        end
+    end
+
+    EH->>EH: aggregate results
+    Note over EH: blockingErrors[] / additionalContexts[]<br/>updatedInput / permissionBehavior
+    EH->>Caller: yield AggregatedHookResult
+</pre>
+</div>
+<hr>
+<h2>六、典型应用场景</h2>
+<h3>工具执行类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>典型场景</th></tr></thead>
+<tbody>
+<tr><td><code>PreToolUse</code></td><td>拦截危险命令（<code>rm -rf</code>、<code>DROP TABLE</code>）；修改文件路径；日志审计所有 Bash 命令；非工作目录文件禁止写入</td></tr>
+<tr><td><code>PostToolUse</code></td><td>写文件后自动 prettier/gofmt；修改 .ts 后跑相关测试；eslint --fix；发 Slack 通知</td></tr>
+<tr><td><code>PostToolUseFailure</code></td><td>工具失败上报监控；清理临时状态</td></tr>
+<tr><td><code>PermissionRequest</code></td><td>特定路径自动 allow，其余 ask；企业合规记录</td></tr>
+<tr><td><code>PermissionDenied</code></td><td>审计哪些操作被拒绝</td></tr>
+</tbody>
+</table></div>
+<h3>会话生命周期类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>典型场景</th></tr></thead>
+<tbody>
+<tr><td><code>SessionStart(startup)</code></td><td>验证依赖已安装；加载项目状态注入模型；显示待办</td></tr>
+<tr><td><code>SessionStart(resume)</code></td><td>恢复上次中断的上下文状态</td></tr>
+<tr><td><code>SessionEnd</code></td><td>保存会话摘要；清理临时文件；上报用量</td></tr>
+<tr><td><code>Setup(init)</code></td><td>首次进入项目自动 npm install、初始化数据库</td></tr>
+<tr><td><code>Setup(maintenance)</code></td><td>定期清理缓存、更新依赖</td></tr>
+<tr><td><code>SubagentStart/Stop</code></td><td>为子 agent 注入专属工具；收集子 agent 产出注入主 agent</td></tr>
+</tbody>
+</table></div>
+<h3>用户交互类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>典型场景</th></tr></thead>
+<tbody>
+<tr><td><code>UserPromptSubmit</code></td><td>展开别名（/deploy → 完整部署流程）；过滤 API key 明文；自动附加 git branch / PR 链接；追加项目规范说明</td></tr>
+<tr><td><code>Stop</code></td><td>每次回复后自动 npm run build；检查未提交修改；系统通知"Claude 已完成"；保存对话检查点</td></tr>
+<tr><td><code>StopFailure</code></td><td>API 错误告警（邮件/钉钉）</td></tr>
+</tbody>
+</table></div>
+<h3>压缩与系统类</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>事件</th><th>典型场景</th></tr></thead>
+<tbody>
+<tr><td><code>PreCompact</code></td><td>提示用户确认保存关键变量；自动将重要状态写入文件</td></tr>
+<tr><td><code>PostCompact</code></td><td>重新加载项目状态注入模型；通知用户上下文已折叠</td></tr>
+<tr><td><code>Notification</code></td><td>权限请求时弹系统通知；按类型路由到不同渠道</td></tr>
+<tr><td><code>WorktreeCreate</code></td><td>自动 npm ci；启动数据库容器</td></tr>
+<tr><td><code>WorktreeRemove</code></td><td>清理 Docker 容器；关闭数据库连接</td></tr>
+<tr><td><code>TaskCreated/Completed</code></td><td>同步到 Linear / Jira；完成时触发 CI</td></tr>
+<tr><td><code>FileChanged</code></td><td>监听配置文件热重载；.env 变更时提示重启</td></tr>
+<tr><td><code>CwdChanged</code></td><td>切换目录后重新加载项目级 context</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2>七、最常用组合</h2>
+<div class="code-block"><pre>// 自动格式化（最常见）
+PostToolUse(Write|Edit) → prettier / gofmt / rustfmt
+
+// Bash 命令审计
+PreToolUse(Bash) → 追加到 ~/.claude/bash-log.txt
+
+// 每轮构建检查
+Stop → npm run build || exit 2
+
+// 用户提示词增强
+UserPromptSubmit → 注入 git status + 当前 PR 信息
+
+// 项目初始化
+SessionStart(startup) → 检查 node 版本 + npm install
+
+// 危险命令拦截
+PreToolUse(Bash) if=Bash(rm -rf*) → exit 2 并输出告警</pre></div>
+<hr>
+<h2>八、关键文件索引</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>文件</th><th>职责</th></tr></thead>
+<tbody>
+<tr><td><code>src/entrypoints/sdk/coreTypes.ts:25</code></td><td>Hook 事件枚举（26 个）</td></tr>
+<tr><td><code>src/schemas/hooks.ts</code></td><td>Zod 配置 schema（5 种类型）</td></tr>
+<tr><td><code>src/types/hooks.ts</code></td><td>输入/输出类型定义</td></tr>
+<tr><td><code>src/utils/hooks.ts:1603</code></td><td><code>getMatchingHooks()</code> 匹配逻辑</td></tr>
+<tr><td><code>src/utils/hooks.ts:1976</code></td><td><code>executeHooks()</code> 核心调度</td></tr>
+<tr><td><code>src/utils/hooks/hooksSettings.ts</code></td><td>多来源聚合、去重、优先级</td></tr>
+<tr><td><code>src/utils/hooks/hooksConfigSnapshot.ts</code></td><td>启动时快照、策略管控</td></tr>
+<tr><td><code>src/utils/hooks/hookEvents.ts</code></td><td>事件发射/观测（HookStarted/Progress/Response）</td></tr>
+<tr><td><code>src/utils/hooks/execPromptHook.ts</code></td><td>LLM hook 执行</td></tr>
+<tr><td><code>src/utils/hooks/execAgentHook.ts</code></td><td>Agent hook 执行</td></tr>
+<tr><td><code>src/utils/hooks/execHttpHook.ts</code></td><td>HTTP hook 执行</td></tr>
+</tbody>
+</table></div>
+    </div>
+  </main>
+</div>
+
+<div class="statusbar">
+  <span><b>topic-hook-system.md</b> &nbsp;|&nbsp; Hook 子系统完全指南</span>
+  <span>lines:∞ &nbsp;|&nbsp; utf-8 &nbsp;|&nbsp; <b>READ</b></span>
+</div>
+
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    background: '#0d110d',
+    primaryColor: '#0d110d',
+    primaryTextColor: '#00e676',
+    primaryBorderColor: '#1a2e1a',
+    lineColor: '#00b050',
+    secondaryColor: '#0a0d0a',
+    tertiaryColor: '#0a0d0a',
+    edgeLabelBackground: '#0d110d',
+    actorBkg: '#0d110d',
+    actorBorder: '#00b050',
+    actorTextColor: '#00e676',
+    actorLineColor: '#1a2e1a',
+    signalColor: '#00b050',
+    signalTextColor: '#69ff9c',
+    labelBoxBkgColor: '#0d110d',
+    labelBoxBorderColor: '#1a2e1a',
+    labelTextColor: '#00e676',
+    loopTextColor: '#00e676',
+    noteBorderColor: '#1a2e1a',
+    noteBkgColor: '#0d110d',
+    noteTextColor: '#00b050',
+    activationBorderColor: '#00e676',
+    activationBkgColor: '#0d110d',
+    sequenceNumberColor: '#00b050',
+    fontFamily: 'JetBrains Mono, Courier New, monospace',
+    fontSize: '11px'
+  }
+})
+</script>
+</body>
+</html>
