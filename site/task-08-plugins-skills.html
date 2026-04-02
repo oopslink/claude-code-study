@@ -104,6 +104,10 @@ body{animation:flicker 8s infinite}
 .menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
 .menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
 
+/* mermaid diagram */
+.mermaid-wrap{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:20px;margin:16px 0 24px;overflow-x:auto}
+.mermaid svg{max-width:100%}
+
 /* mobile */
 @media(max-width:700px){
   html,body{overflow:auto}
@@ -248,7 +252,7 @@ body{animation:flicker 8s infinite}
     </table>
   
     </div>
-    <div class="sidebar-footer">25 files found.<br>@ 1909120f</div>
+    <div class="sidebar-footer">25 files found.<br>@ 9f5bd28</div>
   </nav>
 
   <main class="main">
@@ -806,5 +810,31 @@ Claude 看到 Skill 内容，按指令执行任务</pre></div><hr>
   <span>© 2026 &nbsp;<b>claude-code-study</b></span>
 </footer>
 
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    background: '#0d110d',
+    primaryColor: '#0d110d',
+    primaryTextColor: '#00e676',
+    primaryBorderColor: '#1a2e1a',
+    lineColor: '#00b050',
+    actorBkg: '#0d110d',
+    actorBorder: '#00b050',
+    actorTextColor: '#00e676',
+    signalColor: '#00b050',
+    signalTextColor: '#69ff9c',
+    labelBoxBkgColor: '#0d110d',
+    labelBoxBorderColor: '#1a2e1a',
+    labelTextColor: '#00e676',
+    noteBkgColor: '#0d110d',
+    noteTextColor: '#00b050',
+    fontFamily: 'JetBrains Mono, Courier New, monospace',
+    fontSize: '11px'
+  }
+})
+</script>
 </body>
 </html>

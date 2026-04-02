@@ -65,6 +65,7 @@ const NAV = [
     items: [
       { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
       { file: 'superpowers/storage-architecture.md', slug: 'storage-architecture', title: '专题 02 · 存储架构完全指南' },
+      { file: 'superpowers/topic-hook-system.md', slug: 'topic-hook-system', title: '专题 03 · Hook 子系统' },
     ],
   },
 ]
@@ -92,6 +93,9 @@ renderer.link = function (href, title, text) {
 }
 
 renderer.code = function (code, lang) {
+  if (lang === 'mermaid') {
+    return `<div class="mermaid-wrap"><pre class="mermaid">${String(code ?? '')}</pre></div>`
+  }
   return `<div class="code-block"><pre>${escapeHtml(String(code ?? ''))}</pre></div>`
 }
 
@@ -236,6 +240,10 @@ body{animation:flicker 8s infinite}
 .menu-toggle{display:none;background:none;border:1px solid var(--green-dim);color:var(--green);font-family:inherit;font-size:11px;padding:3px 10px;cursor:pointer;letter-spacing:1px}
 .menu-toggle:hover{border-color:var(--green);color:var(--green-bright)}
 
+/* mermaid diagram */
+.mermaid-wrap{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green-dim);border-radius:4px;padding:20px;margin:16px 0 24px;overflow-x:auto}
+.mermaid svg{max-width:100%}
+
 /* mobile */
 @media(max-width:700px){
   html,body{overflow:auto}
@@ -330,6 +338,32 @@ function buildPage({ slug, title, promptPath, content, sidebarHtml, totalFiles }
   <span>© 2026 &nbsp;<b>claude-code-study</b></span>
 </footer>
 
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    background: '#0d110d',
+    primaryColor: '#0d110d',
+    primaryTextColor: '#00e676',
+    primaryBorderColor: '#1a2e1a',
+    lineColor: '#00b050',
+    actorBkg: '#0d110d',
+    actorBorder: '#00b050',
+    actorTextColor: '#00e676',
+    signalColor: '#00b050',
+    signalTextColor: '#69ff9c',
+    labelBoxBkgColor: '#0d110d',
+    labelBoxBorderColor: '#1a2e1a',
+    labelTextColor: '#00e676',
+    noteBkgColor: '#0d110d',
+    noteTextColor: '#00b050',
+    fontFamily: 'JetBrains Mono, Courier New, monospace',
+    fontSize: '11px'
+  }
+})
+</script>
 </body>
 </html>`
 }
