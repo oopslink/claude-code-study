@@ -66,6 +66,7 @@ const NAV = [
       { file: 'superpowers/socratic-01-security-and-agent-loop.md', slug: 'socratic-01-security-and-agent-loop', title: '专题 01 · 安全与 Agent 循环' },
       { file: 'superpowers/storage-architecture.md', slug: 'storage-architecture', title: '专题 02 · 存储架构完全指南' },
       { file: 'superpowers/topic-hook-system.md', slug: 'topic-hook-system', title: '专题 03 · Hook 子系统' },
+      { file: 'superpowers/topic-source-leak.md', slug: 'topic-source-leak', title: '专题 04 · 源码泄漏事件' },
     ],
   },
 ]
